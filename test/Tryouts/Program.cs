@@ -1,6 +1,7 @@
 ﻿using System;
 using Npgsql;
 using NpgsqlTypes;
+using PgRvn.Server;
 
 namespace Tryouts
 {
@@ -29,7 +30,21 @@ namespace Tryouts
 
         static void Main(string[] args)
         {
-            var connString = "Host=127.0.0.1;Port=5432;Username=postgres;Password=123456;Database=BookStore";
+
+            try
+            {
+                var server = new PgRvnServer();
+                server.Initialize();
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Unhandled exception occurred");
+                Console.WriteLine(e);
+                return;
+            }
+
+            var connString = "Host=127.0.0.1;Port=5433;User Id=omer;Database=BookStore";
 
             using var conn = new NpgsqlConnection(connString);
             conn.Open();

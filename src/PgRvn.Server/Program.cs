@@ -4,9 +4,9 @@ namespace PgRvn.Server
 {
     class Program
     {
-        static void Main(string[] args)
+        public static int Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            return 0;
         }
     }
 }
