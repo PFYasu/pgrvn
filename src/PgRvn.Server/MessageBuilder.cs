@@ -23,8 +23,10 @@ namespace PgRvn.Server
         {
             const int messageLen = 6;
             Buffer.Span[0] = (byte)'Z';
+
             var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
-            payload[0] = IPAddress.HostToNetworkOrder(5);
+            payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
+
             Buffer.Span[5] = insideTransaction ? (byte)'T' : (byte)'I'; // TODO: 'E' if in a failed transaction block
             return Buffer[..messageLen];
         }
@@ -33,9 +35,11 @@ namespace PgRvn.Server
         {
             const int messageLen = 9;
             Buffer.Span[0] = (byte)'R';
+
             var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
-            payload[0] = IPAddress.HostToNetworkOrder(8);
+            payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
             payload[1] = 0;
+
             return Buffer[..messageLen];
         }
 
@@ -44,10 +48,12 @@ namespace PgRvn.Server
         {
             const int messageLen = 13;
             Buffer.Span[0] = (byte)'K';
+
             var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
             payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
             payload[1] = IPAddress.HostToNetworkOrder(processId);
             payload[2] = IPAddress.HostToNetworkOrder(sessionId);
+
             return Buffer[..messageLen];
         }
 
@@ -76,6 +82,17 @@ namespace PgRvn.Server
             var asInts = MemoryMarshal.Cast<byte, int>(buffer[1..]);
             asInts[0] = IPAddress.NetworkToHostOrder(pos - 1);
             return pos;
+        }
+
+        public ReadOnlyMemory<byte> ParseComplete()
+        {
+            const int messageLen = 5;
+            Buffer.Span[0] = (byte)'1';
+
+            var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
+            payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
+
+            return Buffer[..messageLen];
         }
 
         public void Dispose()

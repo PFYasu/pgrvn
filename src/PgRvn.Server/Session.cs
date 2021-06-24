@@ -50,35 +50,60 @@ namespace PgRvn.Server
             var writer = PipeWriter.Create(stream);
 
             var msgLen = await ReadInt32Async(reader) - sizeof(int);
-            var version = await ReadInt32Async(reader);
+            var protocolVersion = await ReadInt32Async(reader);
 
-            if (version == (int) ProtocolVersion.TlsConnection)
-            {
-                // TODO: Respond with 'S' if willing to perform SSL or 'N' otherwise
-                throw new NotSupportedException("Will handle later");
-                // establish ssl
-                // await HandleHandshake(version, msgLen, reader
-            }
+            protocolVersion = await HandleTlsConnection(protocolVersion);
 
-            if (version == (int) ProtocolVersion.CancelMessage)
+            if (protocolVersion == (int) ProtocolVersion.CancelMessage)
             {
-                // TODO: Check if Cancel message
+                // TODO: Handle Cancel message
                 throw new NotSupportedException("Will handle later");
             }
             else
             {
-                await HandleHandshake(version, msgLen, reader);
+                await HandleHandshake(protocolVersion, msgLen, reader);
             }
             
             await writer.WriteAsync(messageBuilder.AuthenticationOk(), _token);
             await writer.WriteAsync(messageBuilder.ParameterStatusMessages(PgConfig.ParameterStatusList), _token);
             await writer.WriteAsync(messageBuilder.BackendKeyData(_processId, _identifier), _token);
+            await writer.WriteAsync(messageBuilder.ReadyForQuery(), _token);
+
+            Transaction transaction = null;
 
             while (_token.IsCancellationRequested == false)
             {
-                await writer.WriteAsync(messageBuilder.ReadyForQuery(), _token);
-                await ReadMessage(reader);
+                Message message = await HandleMessage(reader, writer, messageBuilder);
+
+                if (message.Type == MessageType.Parse && transaction == null)
+                {
+                    transaction = new Transaction((Parse)message);
+                }
+
+                if (transaction == null)
+                {
+                    await writer.WriteAsync(messageBuilder.ReadyForQuery(), _token);
+                }
+                else
+                {
+                    transaction.Update(message);
+                }
             }
+        }
+
+        private async Task<int> HandleTlsConnection(int protocolVersion)
+        {
+            if (protocolVersion == (int)ProtocolVersion.TlsConnection)
+            {
+                // TODO: Respond with 'S' if willing to perform SSL or 'N' otherwise
+                throw new NotSupportedException("Will handle later");
+                // establish ssl
+                // await HandleHandshake(version, msgLen, reader
+                // Get new protocol version
+                // protocolVersion = givenVersion
+            }
+
+            return protocolVersion;
         }
 
         private void ExecuteStatement(TSQLStatement stmt)
@@ -119,48 +144,52 @@ namespace PgRvn.Server
 
         private static object VersionMethod(List<TSQLToken> tokens, ref int offset)
         {
-            offset++;// todo: validate
+            offset++; // todo: validate
             return "0.10-alpga2";
         }
         
 
-        private async Task<Message> ReadMessage(PipeReader reader)
+        private async Task<Message> HandleMessage(PipeReader reader, PipeWriter writer, MessageBuilder messageBuilder)
         {
-            var read = await reader.ReadAsync(_token);
-            if (read.Buffer.IsEmpty)
-                throw new EndOfStreamException();
-
-            var msgType = read.Buffer.First.Span[0];
-            reader.AdvanceTo(read.Buffer.GetPosition(1, read.Buffer.Start));
+            var msgType = await ReadCharAsync(reader);
             switch (msgType)
             {
-                case (byte)'P':
+                case 'P':
                     var len = await ReadInt32Async(reader) - sizeof(int);
+
                     var (statementName, statementLength) = await ReadNullTerminatedString(reader);
                     len -= statementLength;
+
                     var (query, queryLength) = await ReadNullTerminatedString(reader);
                     len -= queryLength;
+
                     var parametersCount = await ReadInt16Async(reader);
                     len -= sizeof(short);
+
                     var parameters = new int[parametersCount];
                     for (int i = 0; i < parametersCount; i++)
                     {
                         parameters[i] = await ReadInt32Async(reader);
                     }
 
-                    var tsqlStatements = TSQLStatementReader.ParseStatements(query);
-                    int offset = 1;
-                    SelectField(tsqlStatements[0], ref offset);
+                    // Parse SQL
+                    //var tsqlStatements = TSQLStatementReader.ParseStatements(query);
+                    //int offset = 1;
+                    //SelectField(tsqlStatements[0], ref offset);
+
                     if (len != 0)
                         throw new InvalidOperationException("Wrong size?");
+
+                    await writer.WriteAsync(messageBuilder.ParseComplete(), _token);
+
                     return new Parse
                     {
-                        Key = statementName,
+                        StatementName = statementName,
                         Query = query,
                         Parameters = parameters
                     };
                 default:
-                    throw new NotSupportedException("Message type: " + (char) msgType);
+                    throw new NotSupportedException("Message type unsupported: " + (char) msgType);
             }
         }
 
@@ -195,18 +224,21 @@ namespace PgRvn.Server
         {
             ReadResult read;
             SequencePosition? end;
+
             while (true)
             {
                 read = await reader.ReadAsync(_token);
                 end = read.Buffer.PositionOf((byte)0);
                 if (end != null)
                     break;
+
                 reader.AdvanceTo(read.Buffer.Start, read.Buffer.End);
             }
 
             var match = read.Buffer.Slice(0, end.Value);
             var result = Encoding.UTF8.GetString(match);
             reader.AdvanceTo(read.Buffer.GetPosition(1, end.Value));
+
             return (result, (int)match.Length + 1);
         }
         private async Task<ReadResult> ReadMinimumOf(PipeReader reader, int minSizeRequired)
@@ -234,6 +266,12 @@ namespace PgRvn.Server
             return ReadInt16(read, reader);
         }
 
+        private async Task<char> ReadCharAsync(PipeReader reader)
+        {
+            var read = await ReadMinimumOf(reader, sizeof(char));
+            return ReadChar(read, reader);
+        }
+
         private static int ReadInt32(ReadResult read, PipeReader reader)
         {
             var sequence = read.Buffer.Slice(0, sizeof(int));
@@ -251,16 +289,29 @@ namespace PgRvn.Server
             reader.AdvanceTo(sequence.End);
             return IPAddress.NetworkToHostOrder(MemoryMarshal.AsRef<short>(buffer));
         }
+        private static char ReadChar(ReadResult read, PipeReader reader)
+        {
+            var charByte = read.Buffer.First.Span[0];
+            reader.AdvanceTo(read.Buffer.GetPosition(1, read.Buffer.Start));
+
+            return (char)charByte;
+        }
+    }
+
+    public enum MessageType : byte
+    {
+        Parse = (byte)'P'
     }
 
     public abstract class Message
     {
-        
+        public abstract MessageType Type { get; }
     }
 
     public class Parse : Message
     {
-        public string Key;
+        public override MessageType Type => MessageType.Parse;
+        public string StatementName;
         public string Query;
         public int[] Parameters;
     }
