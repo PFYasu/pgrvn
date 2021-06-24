@@ -23,7 +23,7 @@ namespace PgRvn.Server
         private readonly CancellationTokenSource _cts = new();
         private TcpListener _tcpListener;
         private int _sessionIdentifier;
-        private int _processId;
+        private readonly int _processId;
 
 
         public PgRvnServer()
