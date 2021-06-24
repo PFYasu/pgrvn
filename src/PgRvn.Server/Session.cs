@@ -73,20 +73,32 @@ namespace PgRvn.Server
 
             while (_token.IsCancellationRequested == false)
             {
-                Message message = await HandleMessage(reader, writer, messageBuilder);
+                Message message = await ReadMessage(reader, writer, messageBuilder);
 
-                if (message.Type == MessageType.Parse && transaction == null)
+                switch (message.Type)
                 {
-                    transaction = new Transaction((Parse)message);
+                    case MessageType.Parse:
+                        transaction = new Transaction();
+                        var response = transaction.Parse(message, messageBuilder);
+                        await writer.WriteAsync(response, _token);
+                        break;
+                    case MessageType.Bind:
+                        transaction?.Bind(message, messageBuilder);
+                        break;
+                    case MessageType.Describe:
+                        transaction?.Describe(message, messageBuilder);
+                        break;
+                    case MessageType.Execute:
+                        transaction?.Execute(message, messageBuilder);
+                        break;
+                    default:
+                        throw new NotSupportedException("Unsupported message type: " + (char)message.Type);
+
                 }
 
                 if (transaction == null)
                 {
                     await writer.WriteAsync(messageBuilder.ReadyForQuery(), _token);
-                }
-                else
-                {
-                    transaction.Update(message);
                 }
             }
         }
@@ -149,12 +161,13 @@ namespace PgRvn.Server
         }
         
 
-        private async Task<Message> HandleMessage(PipeReader reader, PipeWriter writer, MessageBuilder messageBuilder)
+        private async Task<Message> ReadMessage(PipeReader reader, PipeWriter writer, MessageBuilder messageBuilder)
         {
             var msgType = await ReadCharAsync(reader);
+
             switch (msgType)
             {
-                case 'P':
+                case (char)MessageType.Parse:
                     var len = await ReadInt32Async(reader) - sizeof(int);
 
                     var (statementName, statementLength) = await ReadNullTerminatedString(reader);
@@ -179,8 +192,6 @@ namespace PgRvn.Server
 
                     if (len != 0)
                         throw new InvalidOperationException("Wrong size?");
-
-                    await writer.WriteAsync(messageBuilder.ParseComplete(), _token);
 
                     return new Parse
                     {
@@ -300,7 +311,18 @@ namespace PgRvn.Server
 
     public enum MessageType : byte
     {
-        Parse = (byte)'P'
+        // Received
+        Parse = (byte)'P',
+        Bind = (byte)'B',
+        Describe = (byte)'D',
+        Execute = (byte)'E',
+
+        // Sent
+        ParameterStatus = (byte)'S',
+        ParseComplete = (byte)'1',
+        BackendKeyData = (byte)'K',
+        AuthenticationOk = (byte)'R',
+        ReadyForQuery = (byte)'Z',
     }
 
     public abstract class Message

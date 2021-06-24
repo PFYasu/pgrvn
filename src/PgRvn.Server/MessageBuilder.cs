@@ -22,7 +22,7 @@ namespace PgRvn.Server
         public ReadOnlyMemory<byte> ReadyForQuery(bool insideTransaction = false)
         {
             const int messageLen = 6;
-            Buffer.Span[0] = (byte)'Z';
+            Buffer.Span[0] = (byte)MessageType.ReadyForQuery;
 
             var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
             payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
@@ -34,7 +34,7 @@ namespace PgRvn.Server
         public ReadOnlyMemory<byte> AuthenticationOk()
         {
             const int messageLen = 9;
-            Buffer.Span[0] = (byte)'R';
+            Buffer.Span[0] = (byte)MessageType.AuthenticationOk;
 
             var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
             payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
@@ -47,7 +47,7 @@ namespace PgRvn.Server
         public ReadOnlyMemory<byte> BackendKeyData(int processId, int sessionId)
         {
             const int messageLen = 13;
-            Buffer.Span[0] = (byte)'K';
+            Buffer.Span[0] = (byte)MessageType.BackendKeyData;
 
             var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
             payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
@@ -70,7 +70,7 @@ namespace PgRvn.Server
 
         private int ParameterStatus(string key, string val, Span<byte> buffer)
         {
-            buffer[0] = (byte)'S';
+            buffer[0] = (byte)MessageType.ParameterStatus;
             int pos = 5;
 
             pos += Encoding.UTF8.GetBytes(key, buffer[pos..]);
@@ -87,7 +87,7 @@ namespace PgRvn.Server
         public ReadOnlyMemory<byte> ParseComplete()
         {
             const int messageLen = 5;
-            Buffer.Span[0] = (byte)'1';
+            Buffer.Span[0] = (byte)MessageType.ParseComplete;
 
             var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
             payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
