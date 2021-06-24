@@ -2,6 +2,7 @@
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.IO.Pipelines;
 using System.Linq;
 using System.Net;
@@ -10,6 +11,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using TSQL;
+using TSQL.Statements;
+using TSQL.Tokens;
 
 namespace PgRvn.Server
 {
@@ -32,7 +36,8 @@ namespace PgRvn.Server
         public enum ProtocolVersion
         {
             Version3 = 0x00030000,
-            TlsConnection = 0x4d2162f
+            TlsConnection = 80877103,
+            CancelMessage = 080877102
         }
 
         public async Task Run()
@@ -54,43 +59,110 @@ namespace PgRvn.Server
                 // establish ssl
                 // await HandleHandshake(version, msgLen, reader
             }
+
+            if (version == (int) ProtocolVersion.CancelMessage)
+            {
+                // TODO: Check if Cancel message
+                throw new NotSupportedException("Will handle later");
+            }
             else
             {
                 await HandleHandshake(version, msgLen, reader);
             }
-
-            await writer.WriteAsync(messageBuilder.AuthenticationOkMessage(), _token);
-            await writer.WriteAsync(messageBuilder.ParameterStatusMessages(new Dictionary<string, string>
-            {
-                ["client_encoding"] =  "UTF8",
-                ["server_encoding"] =  "UTF8",
-                ["server_version"] = "13.3", // TODO
-                ["application_name"] = "",
-                ["DataStyle"] = "ISO, DMY",
-                ["integer_datetimes"] = "on",
-                ["IntervalStyle"] = "postgres",
-                ["is_superuser"] = "on", // TODO
-                ["session_authorization"] = "postgres",
-                ["standard_conforming_strings"] = "on",
-                ["TimeZone"] = "Asia/Jerusalem", // TODO
-            }), _token);
-
+            
+            await writer.WriteAsync(messageBuilder.AuthenticationOk(), _token);
+            await writer.WriteAsync(messageBuilder.ParameterStatusMessages(PgConfig.ParameterStatusList), _token);
             await writer.WriteAsync(messageBuilder.BackendKeyData(_processId, _identifier), _token);
 
-            while (_token.IsCancellationRequested ==false)
+            while (_token.IsCancellationRequested == false)
             {
                 await writer.WriteAsync(messageBuilder.ReadyForQuery(), _token);
                 await ReadMessage(reader);
             }
         }
 
-        private async Task ReadMessage(PipeReader reader)
+        private void ExecuteStatement(TSQLStatement stmt)
         {
-            var read = await reader.ReadAsync(_token);
-            var len = read.Buffer.Length;
-            var msgType = (char)read.Buffer.First.Span[0];
+            if (stmt.AsSelect.From == null)
+            {
+                var offset = 1;
+                SelectField(stmt, ref offset);
+            }
         }
 
+        private static void SelectField(TSQLStatement stmt, ref int offset)
+        {
+            var identifier = stmt.AsSelect.Select.Tokens[offset];
+            switch (identifier.Type)
+            {
+                case TSQLTokenType.Identifier:
+                    if (offset + 1 < stmt.AsSelect.Select.Tokens.Count)
+                    {
+                        if (stmt.AsSelect.Select.Tokens[offset + 1].Text == "(")
+                        {
+                            offset += 2;
+                            var result = methods[identifier.Text](stmt.AsSelect.Select.Tokens, ref offset); 
+                        }
+                    }
+                    break;
+                default:
+                    throw new NotSupportedException(identifier.ToString());
+            }
+        }
+
+        private delegate object SqlMethodDelegate(List<TSQLToken> tokens, ref int offset);
+
+        private static Dictionary<string, SqlMethodDelegate> methods = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["version"] = VersionMethod
+        };
+
+        private static object VersionMethod(List<TSQLToken> tokens, ref int offset)
+        {
+            offset++;// todo: validate
+            return "0.10-alpga2";
+        }
+        
+
+        private async Task<Message> ReadMessage(PipeReader reader)
+        {
+            var read = await reader.ReadAsync(_token);
+            if (read.Buffer.IsEmpty)
+                throw new EndOfStreamException();
+
+            var msgType = read.Buffer.First.Span[0];
+            reader.AdvanceTo(read.Buffer.GetPosition(1, read.Buffer.Start));
+            switch (msgType)
+            {
+                case (byte)'P':
+                    var len = await ReadInt32Async(reader) - sizeof(int);
+                    var (statementName, statementLength) = await ReadNullTerminatedString(reader);
+                    len -= statementLength;
+                    var (query, queryLength) = await ReadNullTerminatedString(reader);
+                    len -= queryLength;
+                    var parametersCount = await ReadInt16Async(reader);
+                    len -= sizeof(short);
+                    var parameters = new int[parametersCount];
+                    for (int i = 0; i < parametersCount; i++)
+                    {
+                        parameters[i] = await ReadInt32Async(reader);
+                    }
+
+                    var tsqlStatements = TSQLStatementReader.ParseStatements(query);
+                    int offset = 1;
+                    SelectField(tsqlStatements[0], ref offset);
+                    if (len != 0)
+                        throw new InvalidOperationException("Wrong size?");
+                    return new Parse
+                    {
+                        Key = statementName,
+                        Query = query,
+                        Parameters = parameters
+                    };
+                default:
+                    throw new NotSupportedException("Message type: " + (char) msgType);
+            }
+        }
 
         private async Task HandleHandshake(int version, int msgLen, PipeReader reader)
         {
@@ -156,14 +228,40 @@ namespace PgRvn.Server
             return ReadInt32(read, reader);
         }
 
+        private async Task<short> ReadInt16Async(PipeReader reader)
+        {
+            var read = await ReadMinimumOf(reader, sizeof(int));
+            return ReadInt16(read, reader);
+        }
+
         private static int ReadInt32(ReadResult read, PipeReader reader)
         {
             var sequence = read.Buffer.Slice(0, sizeof(int));
             Span<byte> buffer = stackalloc byte[sizeof(int)];
             sequence.CopyTo(buffer);
             reader.AdvanceTo(sequence.End);
-            var len = IPAddress.NetworkToHostOrder(MemoryMarshal.AsRef<int>(buffer));
-            return len;
+            return IPAddress.NetworkToHostOrder(MemoryMarshal.AsRef<int>(buffer));
         }
+
+        private static short ReadInt16(ReadResult read, PipeReader reader)
+        {
+            var sequence = read.Buffer.Slice(0, sizeof(short));
+            Span<byte> buffer = stackalloc byte[sizeof(short)];
+            sequence.CopyTo(buffer);
+            reader.AdvanceTo(sequence.End);
+            return IPAddress.NetworkToHostOrder(MemoryMarshal.AsRef<short>(buffer));
+        }
+    }
+
+    public abstract class Message
+    {
+        
+    }
+
+    public class Parse : Message
+    {
+        public string Key;
+        public string Query;
+        public int[] Parameters;
     }
 }

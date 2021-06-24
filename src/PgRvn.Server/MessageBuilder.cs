@@ -29,7 +29,7 @@ namespace PgRvn.Server
             return Buffer[..messageLen];
         }
 
-        public ReadOnlyMemory<byte> AuthenticationOkMessage()
+        public ReadOnlyMemory<byte> AuthenticationOk()
         {
             const int messageLen = 9;
             Buffer.Span[0] = (byte)'R';
@@ -51,7 +51,7 @@ namespace PgRvn.Server
             return Buffer[..messageLen];
         }
 
-        public Memory<byte> ParameterStatusMessages(Dictionary<string, string> status)
+        public ReadOnlyMemory<byte> ParameterStatusMessages(Dictionary<string, string> status)
         {
             int pos = 0;
             foreach (var (key, val) in status)
@@ -62,7 +62,7 @@ namespace PgRvn.Server
             return Buffer[..pos];
         }
 
-        public int ParameterStatus(string key, string val, Span<byte> buffer)
+        private int ParameterStatus(string key, string val, Span<byte> buffer)
         {
             buffer[0] = (byte)'S';
             int pos = 5;
