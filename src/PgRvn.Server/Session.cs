@@ -69,7 +69,7 @@ namespace PgRvn.Server
             await writer.WriteAsync(messageBuilder.BackendKeyData(_processId, _identifier), _token);
             await writer.WriteAsync(messageBuilder.ReadyForQuery(), _token);
 
-            Transaction transaction = null;
+            var transaction = new Transaction();
 
             while (_token.IsCancellationRequested == false)
             {
@@ -79,46 +79,34 @@ namespace PgRvn.Server
                 {
                     case MessageType.Parse:
                     {
-                        transaction = new Transaction();
                         var response = transaction.Parse((Parse)message, messageBuilder);
                         await writer.WriteAsync(response, _token);
                         break;
                     }
                     case MessageType.Bind:
                     {
-                        if (transaction != null)
-                        {
-                            var response = transaction.Bind((Bind)message, messageBuilder);
-                            await writer.WriteAsync(response, _token);
-                        }
+                        var response = transaction.Bind((Bind)message, messageBuilder);
+                        await writer.WriteAsync(response, _token);
                         break;
                     }
                     case MessageType.Describe:
                     {
-                        if (transaction != null)
-                        {
-                            var response = transaction.Describe((Describe)message, messageBuilder);
-                            await writer.WriteAsync(response, _token);
-                        }
+                        var response = transaction.Describe((Describe)message, messageBuilder);
+                        await writer.WriteAsync(response, _token);
                         break;
                     }
                     case MessageType.Execute:
                     {
-                        if (transaction != null)
-                        {
-                            var response = transaction.Execute((Execute)message, messageBuilder);
-                            await writer.WriteAsync(response, _token);
-                        }
+                        var response = transaction.Execute((Execute)message, messageBuilder);
+                        await writer.WriteAsync(response, _token);
                         break;
                     }
                     default:
                         throw new NotSupportedException("Unsupported message type: " + (char)message.Type);
                 }
 
-                if (transaction == null)
-                {
-                    await writer.WriteAsync(messageBuilder.ReadyForQuery(), _token);
-                }
+                // TODO: Put this probably in Transaction.Execute
+                //await writer.WriteAsync(messageBuilder.ReadyForQuery(), _token);
             }
         }
 
@@ -221,7 +209,7 @@ namespace PgRvn.Server
                     };
                 }
 
-                case (char) MessageType.Bind:
+                case (char)MessageType.Bind:
                 {
                     var (destPortalName, destPortalLength) = await ReadNullTerminatedString(reader);
                     msgLen -= destPortalLength;
@@ -274,6 +262,32 @@ namespace PgRvn.Server
                         ParameterFormatCodes = parameterCodes,
                         Parameters = parameters,
                         ResultColumnFormatCodes = resultColumnFormatCodes
+                    };
+                }
+
+                case (char)MessageType.Describe:
+                {
+                    var describeObjectType = await ReadCharAsync(reader);
+                    msgLen -= sizeof(char);
+
+                    var pgObjectType = describeObjectType switch
+                    {
+                        (char)PgObjectType.Portal => PgObjectType.Portal,
+                        (char)PgObjectType.PreparedStatement => PgObjectType.PreparedStatement,
+                        _ => throw new InvalidOperationException("Expected valid object type ('S' or 'P'), got: '" +
+                                                                 describeObjectType)
+                    };
+
+                    var (describedName, describedNameLength) = await ReadNullTerminatedString(reader);
+                    msgLen -= describedNameLength;
+
+                    if (msgLen != 0)
+                        throw new InvalidOperationException("Wrong size?");
+
+                    return new Describe
+                    {
+                        PgObjectType = pgObjectType,
+                        ObjectName = describedName
                     };
                 }
 

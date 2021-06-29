@@ -22,6 +22,31 @@ namespace PgRvn.Server
 
         ParseComplete = (byte)'1',
         BindComplete = (byte)'2',
+        ParameterDescription = (byte)'t',
+        RowDescription = (byte)'T',
+    }
+
+    public enum PgObjectType : byte
+    {
+        PreparedStatement = (byte)'S',
+        Portal = (byte)'P'
+    }
+
+    public class PgField
+    {
+        public string Name;
+        /// <summary>
+        /// If the field can be identified as a column of a specific table, the object ID of the table; otherwise zero.
+        /// </summary>
+        public int TableObjectId;
+        /// <summary>
+        /// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero.
+        /// </summary>
+        public short ColumnAttributeNumber;
+        public int DataTypeObjectId;
+        public short DataTypeSize;
+        public int TypeModifier;
+        public short FormatCode;
     }
 
     public abstract class Message
@@ -50,6 +75,12 @@ namespace PgRvn.Server
     public class Describe : Message
     {
         public override MessageType Type => MessageType.Describe;
+
+        /// <summary>
+        /// Type of Postgres object to describe (Portal/Statement)
+        /// </summary>
+        public PgObjectType PgObjectType;
+        public string ObjectName;
     }
 
     public class Execute : Message
