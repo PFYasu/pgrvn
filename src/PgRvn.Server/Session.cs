@@ -170,12 +170,12 @@ namespace PgRvn.Server
 
         private async Task<Message> ReadMessage(PipeReader reader)
         {
-            var msgType = await ReadCharAsync(reader);
+            var msgType = await ReadByteAsync(reader);
             var msgLen = await ReadInt32Async(reader) - sizeof(int);
 
             switch (msgType)
             {
-                case (char) MessageType.Parse:
+                case (byte)MessageType.Parse:
                 {
                     var (statementName, statementLength) = await ReadNullTerminatedString(reader);
                     msgLen -= statementLength;
@@ -209,7 +209,7 @@ namespace PgRvn.Server
                     };
                 }
 
-                case (char)MessageType.Bind:
+                case (byte)MessageType.Bind:
                 {
                     var (destPortalName, destPortalLength) = await ReadNullTerminatedString(reader);
                     msgLen -= destPortalLength;
@@ -265,15 +265,15 @@ namespace PgRvn.Server
                     };
                 }
 
-                case (char)MessageType.Describe:
+                case (byte)MessageType.Describe:
                 {
-                    var describeObjectType = await ReadCharAsync(reader);
-                    msgLen -= sizeof(char);
+                    var describeObjectType = await ReadByteAsync(reader);
+                    msgLen -= sizeof(byte);
 
                     var pgObjectType = describeObjectType switch
                     {
-                        (char)PgObjectType.Portal => PgObjectType.Portal,
-                        (char)PgObjectType.PreparedStatement => PgObjectType.PreparedStatement,
+                        (byte)PgObjectType.Portal => PgObjectType.Portal,
+                        (byte)PgObjectType.PreparedStatement => PgObjectType.PreparedStatement,
                         _ => throw new InvalidOperationException("Expected valid object type ('S' or 'P'), got: '" +
                                                                  describeObjectType)
                     };
@@ -375,10 +375,10 @@ namespace PgRvn.Server
             return ReadInt16(read, reader);
         }
 
-        private async Task<char> ReadCharAsync(PipeReader reader)
+        private async Task<byte> ReadByteAsync(PipeReader reader)
         {
-            var read = await ReadMinimumOf(reader, sizeof(char));
-            return ReadChar(read, reader);
+            var read = await ReadMinimumOf(reader, sizeof(byte));
+            return ReadByte(read, reader);
         }
 
         private static byte[] ReadBytes(ReadResult read, PipeReader reader, int length)
@@ -407,12 +407,11 @@ namespace PgRvn.Server
             reader.AdvanceTo(sequence.End);
             return IPAddress.NetworkToHostOrder(MemoryMarshal.AsRef<short>(buffer));
         }
-        private static char ReadChar(ReadResult read, PipeReader reader)
+        private static byte ReadByte(ReadResult read, PipeReader reader)
         {
             var charByte = read.Buffer.First.Span[0];
-            reader.AdvanceTo(read.Buffer.GetPosition(1, read.Buffer.Start));
-
-            return (char)charByte;
+            reader.AdvanceTo(read.Buffer.GetPosition(sizeof(byte), read.Buffer.Start));
+            return charByte;
         }
     }
 }
