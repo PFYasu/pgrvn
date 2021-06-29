@@ -95,6 +95,17 @@ namespace PgRvn.Server
             return Buffer[..messageLen];
         }
 
+        public ReadOnlyMemory<byte> BindComplete()
+        {
+            const int messageLen = 5;
+            Buffer.Span[0] = (byte)MessageType.BindComplete;
+
+            var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
+            payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
+
+            return Buffer[..messageLen];
+        }
+
         public void Dispose()
         {
             _bufferOwner?.Dispose();

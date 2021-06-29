@@ -15,26 +15,29 @@ namespace PgRvn.Server
         {
         }
         
-        public ReadOnlyMemory<byte> Parse(Message message, MessageBuilder messageBuilder)
+        public ReadOnlyMemory<byte> Parse(Parse message, MessageBuilder messageBuilder)
         {
-            _parseMessage = (Parse)message;
+            _parseMessage = message;
 
-            // TODO: Verify parse data and return ErrorMessage if needed
+            // TODO: Verify data and return ErrorMessage if needed
 
             return messageBuilder.ParseComplete();
         }
 
-        public void Bind(Message message, MessageBuilder messageBuilder)
+        public ReadOnlyMemory<byte> Bind(Bind message, MessageBuilder messageBuilder)
         {
+            // TODO: Verify data and return ErrorMessage if needed
+
+            return messageBuilder.BindComplete();
+        }
+
+        public ReadOnlyMemory<byte> Describe(Describe message, MessageBuilder messageBuilder)
+        {
+
             throw new NotImplementedException();
         }
 
-        public void Describe(Message message, MessageBuilder messageBuilder)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Execute(Message message, MessageBuilder messageBuilder)
+        public ReadOnlyMemory<byte> Execute(Message message, MessageBuilder messageBuilder)
         {
             throw new NotImplementedException();
         }

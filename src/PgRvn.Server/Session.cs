@@ -73,27 +73,46 @@ namespace PgRvn.Server
 
             while (_token.IsCancellationRequested == false)
             {
-                Message message = await ReadMessage(reader, writer, messageBuilder);
+                Message message = await ReadMessage(reader);
 
                 switch (message.Type)
                 {
                     case MessageType.Parse:
+                    {
                         transaction = new Transaction();
-                        var response = transaction.Parse(message, messageBuilder);
+                        var response = transaction.Parse((Parse)message, messageBuilder);
                         await writer.WriteAsync(response, _token);
                         break;
+                    }
                     case MessageType.Bind:
-                        transaction?.Bind(message, messageBuilder);
+                    {
+                        if (transaction != null)
+                        {
+                            var response = transaction.Bind((Bind)message, messageBuilder);
+                            await writer.WriteAsync(response, _token);
+                        }
                         break;
+                    }
                     case MessageType.Describe:
-                        transaction?.Describe(message, messageBuilder);
+                    {
+                        if (transaction != null)
+                        {
+                            var response = transaction.Describe((Describe)message, messageBuilder);
+                            await writer.WriteAsync(response, _token);
+                        }
                         break;
+                    }
                     case MessageType.Execute:
-                        transaction?.Execute(message, messageBuilder);
+                    {
+                        if (transaction != null)
+                        {
+                            var response = transaction.Execute((Execute)message, messageBuilder);
+                            await writer.WriteAsync(response, _token);
+                        }
                         break;
+                    }
                     default:
                         throw new NotSupportedException("Unsupported message type: " + (char)message.Type);
-
                 }
 
                 if (transaction == null)
@@ -161,28 +180,29 @@ namespace PgRvn.Server
         }
         
 
-        private async Task<Message> ReadMessage(PipeReader reader, PipeWriter writer, MessageBuilder messageBuilder)
+        private async Task<Message> ReadMessage(PipeReader reader)
         {
             var msgType = await ReadCharAsync(reader);
+            var msgLen = await ReadInt32Async(reader) - sizeof(int);
 
             switch (msgType)
             {
-                case (char)MessageType.Parse:
-                    var len = await ReadInt32Async(reader) - sizeof(int);
-
+                case (char) MessageType.Parse:
+                {
                     var (statementName, statementLength) = await ReadNullTerminatedString(reader);
-                    len -= statementLength;
+                    msgLen -= statementLength;
 
                     var (query, queryLength) = await ReadNullTerminatedString(reader);
-                    len -= queryLength;
+                    msgLen -= queryLength;
 
                     var parametersCount = await ReadInt16Async(reader);
-                    len -= sizeof(short);
+                    msgLen -= sizeof(short);
 
                     var parameters = new int[parametersCount];
                     for (int i = 0; i < parametersCount; i++)
                     {
                         parameters[i] = await ReadInt32Async(reader);
+                        msgLen -= sizeof(int);
                     }
 
                     // Parse SQL
@@ -190,7 +210,7 @@ namespace PgRvn.Server
                     //int offset = 1;
                     //SelectField(tsqlStatements[0], ref offset);
 
-                    if (len != 0)
+                    if (msgLen != 0)
                         throw new InvalidOperationException("Wrong size?");
 
                     return new Parse
@@ -199,6 +219,64 @@ namespace PgRvn.Server
                         Query = query,
                         Parameters = parameters
                     };
+                }
+
+                case (char) MessageType.Bind:
+                {
+                    var (destPortalName, destPortalLength) = await ReadNullTerminatedString(reader);
+                    msgLen -= destPortalLength;
+
+                    var (preparedStatementName, preparedStatementLength) = await ReadNullTerminatedString(reader);
+                    msgLen -= preparedStatementLength;
+
+                    var parameterFormatCodeCount = await ReadInt16Async(reader);
+                    msgLen -= sizeof(short);
+
+                    var parameterCodes = new short[parameterFormatCodeCount];
+                    for (var i = 0; i < parameterFormatCodeCount; i++)
+                    {
+                        parameterCodes[i] = await ReadInt16Async(reader);
+                        msgLen -= sizeof(short);
+                    }
+
+                    var parametersCount = await ReadInt16Async(reader);
+                    msgLen -= sizeof(short);
+
+                    var parameters = new List<byte[]>(parametersCount);
+                    for (var i = 0; i < parametersCount; i++)
+                    {
+                        var parameterLength = await ReadInt32Async(reader);
+                        msgLen -= sizeof(int);
+
+                        // TODO: Is it okay to allocate up to 2GB of data based on external output?
+                        // TODO: Format as bytes vs. text depending on the format codes given
+                        parameters.Add(await ReadBytesAsync(reader, parameterLength));
+                        msgLen -= parameterLength;
+                    }
+
+                    var resultColumnFormatCodesCount = await ReadInt16Async(reader);
+                    msgLen -= sizeof(short);
+
+                    var resultColumnFormatCodes = new short[resultColumnFormatCodesCount];
+                    for (var i = 0; i < resultColumnFormatCodesCount; i++)
+                    {
+                        resultColumnFormatCodes[i] = await ReadInt16Async(reader);
+                        msgLen -= sizeof(short);
+                    }
+
+                    if (msgLen != 0)
+                        throw new InvalidOperationException("Wrong size?");
+
+                    return new Bind
+                    {
+                        PortalName = destPortalName,
+                        StatementName = preparedStatementName,
+                        ParameterFormatCodes = parameterCodes,
+                        Parameters = parameters,
+                        ResultColumnFormatCodes = resultColumnFormatCodes
+                    };
+                }
+
                 default:
                     throw new NotSupportedException("Message type unsupported: " + (char) msgType);
             }
@@ -265,6 +343,12 @@ namespace PgRvn.Server
             return read;
         }
 
+        private async Task<byte[]> ReadBytesAsync(PipeReader reader, int length)
+        {
+            var read = await ReadMinimumOf(reader, length);
+            return ReadBytes(read, reader, length);
+        }
+
         private async Task<int> ReadInt32Async(PipeReader reader)
         {
             var read = await ReadMinimumOf(reader, sizeof(int));
@@ -281,6 +365,15 @@ namespace PgRvn.Server
         {
             var read = await ReadMinimumOf(reader, sizeof(char));
             return ReadChar(read, reader);
+        }
+
+        private static byte[] ReadBytes(ReadResult read, PipeReader reader, int length)
+        {
+            var sequence = read.Buffer.Slice(0, length);
+            var buffer = new byte[length];
+            sequence.CopyTo(buffer);
+            reader.AdvanceTo(sequence.End);
+            return buffer;
         }
 
         private static int ReadInt32(ReadResult read, PipeReader reader)
@@ -307,34 +400,5 @@ namespace PgRvn.Server
 
             return (char)charByte;
         }
-    }
-
-    public enum MessageType : byte
-    {
-        // Received
-        Parse = (byte)'P',
-        Bind = (byte)'B',
-        Describe = (byte)'D',
-        Execute = (byte)'E',
-
-        // Sent
-        ParameterStatus = (byte)'S',
-        ParseComplete = (byte)'1',
-        BackendKeyData = (byte)'K',
-        AuthenticationOk = (byte)'R',
-        ReadyForQuery = (byte)'Z',
-    }
-
-    public abstract class Message
-    {
-        public abstract MessageType Type { get; }
-    }
-
-    public class Parse : Message
-    {
-        public override MessageType Type => MessageType.Parse;
-        public string StatementName;
-        public string Query;
-        public int[] Parameters;
     }
 }
