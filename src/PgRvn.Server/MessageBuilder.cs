@@ -24,43 +24,53 @@ namespace PgRvn.Server
             int pos = 0;
             WriteByte((byte)MessageType.ReadyForQuery, Buffer.Span, ref pos);
 
-            // Skip length for now
-            pos += 4;
+            // Skip length
+            int tempPos = pos;
+            pos += sizeof(int);
 
             // TODO: 'E' if in a failed transaction block
             WriteByte(insideTransaction ? (byte)'T' : (byte)'I', Buffer.Span, ref pos);
 
             // Write length
-            int tempPos = 1;
-            WriteInt32(pos - 1, Buffer.Span, ref tempPos);
+            WriteInt32(pos - sizeof(byte), Buffer.Span, ref tempPos);
 
             return Buffer[..pos];
         }
 
         public ReadOnlyMemory<byte> AuthenticationOk()
         {
-            const int messageLen = 9;
-            Buffer.Span[0] = (byte)MessageType.AuthenticationOk;
+            int pos = 0;
+            WriteByte((byte)MessageType.AuthenticationOk, Buffer.Span, ref pos);
 
-            var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
-            payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
-            payload[1] = 0;
+            // Skip length
+            int tempPos = pos;
+            pos += sizeof(int);
 
-            return Buffer[..messageLen];
+            WriteInt32(0, Buffer.Span, ref pos);
+
+            // Write length
+            WriteInt32(pos - sizeof(byte), Buffer.Span, ref tempPos);
+            
+            return Buffer[..pos];
         }
 
 
         public ReadOnlyMemory<byte> BackendKeyData(int processId, int sessionId)
         {
-            const int messageLen = 13;
-            Buffer.Span[0] = (byte)MessageType.BackendKeyData;
+            int pos = 0;
+            WriteByte((byte)MessageType.BackendKeyData, Buffer.Span, ref pos);
 
-            var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
-            payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
-            payload[1] = IPAddress.HostToNetworkOrder(processId);
-            payload[2] = IPAddress.HostToNetworkOrder(sessionId);
+            // Skip length
+            int tempPos = pos;
+            pos += sizeof(int);
 
-            return Buffer[..messageLen];
+            WriteInt32(processId, Buffer.Span, ref pos);
+            WriteInt32(sessionId, Buffer.Span, ref pos);
+
+            // Write length
+            WriteInt32(pos - sizeof(byte), Buffer.Span, ref tempPos);
+
+            return Buffer[..pos];
         }
 
         public ReadOnlyMemory<byte> ParameterStatusMessages(Dictionary<string, string> status)
@@ -79,17 +89,87 @@ namespace PgRvn.Server
             int pos = 0;
             WriteByte((byte)MessageType.ParameterStatus, buffer, ref pos);
 
-            // Skip length field for now
-            pos += 4;
+            // Skip length
+            int tempPos = pos;
+            pos += sizeof(int);
 
             WriteNullTerminatedString(key, buffer, ref pos);
             WriteNullTerminatedString(value, buffer, ref pos);
 
-            // Write length that was skipped
-            int tempPos = 1;
+            // Write length
+            WriteInt32(pos - sizeof(byte), buffer, ref tempPos);
+
+            return pos;
+        }
+
+        private int RowDescription(IReadOnlyList<PgField> fields, Span<byte> buffer)
+        {
+            // TODO: Make sure parametersDataTypeObjectIds length can be cast to short
+            int pos = 0;
+            WriteByte((byte)MessageType.RowDescription, buffer, ref pos);
+
+            // Skip length
+            int tempPos = pos;
+            pos += sizeof(int);
+
+            // TODO: Make sure fields.Count can be cast to short
+            WriteInt16((short)fields.Count, buffer, ref pos);
+
+            foreach (var field in fields)
+            {
+                WriteNullTerminatedString(field.Name, buffer, ref pos);
+                WriteInt32(field.TableObjectId, buffer, ref pos);
+                WriteInt16(field.ColumnAttributeNumber, buffer, ref pos);
+                WriteInt32(field.DataTypeObjectId, buffer, ref pos);
+                WriteInt16(field.DataTypeSize, buffer, ref pos);
+                WriteInt32(field.TypeModifier, buffer, ref pos);
+                WriteInt16(field.FormatCode, buffer, ref pos);
+            }
+
+            WriteInt32(pos - sizeof(byte), buffer, ref tempPos);
+            return pos;
+        }
+
+        private int ParameterDescription(IReadOnlyList<int> parametersDataTypeObjectIds, Span<byte> buffer)
+        {
+            int pos = 0;
+            WriteByte((byte)MessageType.ParameterDescription, buffer, ref pos);
+
+            // Skip length
+            int tempPos = pos;
+            pos += sizeof(int);
+
+            // TODO: Make sure parametersDataTypeObjectIds.Count can be cast to short
+            WriteInt16((short)parametersDataTypeObjectIds.Count, buffer, ref pos);
+
+            foreach (var t in parametersDataTypeObjectIds)
+            {
+                WriteInt32(t, buffer, ref pos);
+            }
+
             WriteInt32(pos - 1, buffer, ref tempPos);
 
             return pos;
+        }
+
+        public ReadOnlyMemory<byte> ParseComplete()
+        {
+            int pos = 0;
+
+            WriteByte((byte)MessageType.ParseComplete, Buffer.Span, ref pos);
+            WriteInt32(pos + sizeof(int) - sizeof(byte), Buffer.Span, ref pos);
+
+            return Buffer[..pos];
+        }
+
+        public ReadOnlyMemory<byte> BindComplete()
+        {
+            int pos = 0;
+
+            WriteByte((byte)MessageType.BindComplete, Buffer.Span, ref pos);
+            WriteInt32(pos + sizeof(int) - sizeof(byte), Buffer.Span, ref pos);
+
+            return Buffer[..pos];
         }
 
         private void WriteNullTerminatedString(string value, Span<byte> buffer, ref int pos)
@@ -116,81 +196,6 @@ namespace PgRvn.Server
         {
             buffer[pos] = value;
             pos += sizeof(byte);
-        }
-
-        private int RowDescription(IReadOnlyList<PgField> fields, Span<byte> buffer)
-        {
-            // TODO: Make sure parametersDataTypeObjectIds length can be cast to short
-
-            buffer[0] = (byte)MessageType.RowDescription;
-
-            int pos = 5;
-            var fieldsPayload = MemoryMarshal.Cast<byte, short>(buffer[pos..]);
-            fieldsPayload[0] = IPAddress.HostToNetworkOrder((short)fields.Count);
-            pos += sizeof(short);
-
-            foreach (var field in fields)
-            {
-                WriteNullTerminatedString(field.Name, buffer, ref pos);
-                WriteInt32(field.TableObjectId, buffer, ref pos);
-                WriteInt16(field.ColumnAttributeNumber, buffer, ref pos);
-                WriteInt32(field.DataTypeObjectId, buffer, ref pos);
-                WriteInt16(field.DataTypeSize, buffer, ref pos);
-                WriteInt32(field.TypeModifier, buffer, ref pos);
-                WriteInt16(field.FormatCode, buffer, ref pos);
-            }
-
-            var sizePayload = MemoryMarshal.Cast<byte, int>(buffer[1..]);
-            sizePayload[0] = IPAddress.HostToNetworkOrder(pos - 1);
-
-            return pos;
-        }
-
-        private int ParameterDescription(IReadOnlyList<int> parametersDataTypeObjectIds, Span<byte> buffer)
-        {
-            // TODO: Make sure parametersDataTypeObjectIds.Count can be cast to short
-
-            buffer[0] = (byte)MessageType.ParameterDescription;
-
-            int pos = 5;
-            var paramPayload = MemoryMarshal.Cast<byte, short>(buffer[pos..]);
-            paramPayload[0] = IPAddress.HostToNetworkOrder((short)parametersDataTypeObjectIds.Count);
-            pos += sizeof(short);
-
-            var objectIdPayload = MemoryMarshal.Cast<byte, int>(buffer[pos..]);
-
-            for (var i = 0; i < parametersDataTypeObjectIds.Count; i++)
-            {
-                objectIdPayload[i] = IPAddress.HostToNetworkOrder(parametersDataTypeObjectIds[i]);
-                pos += sizeof(int);
-            }
-
-            var sizePayload = MemoryMarshal.Cast<byte, int>(buffer[1..]);
-            sizePayload[0] = IPAddress.HostToNetworkOrder(pos - 1);
-
-            return pos;
-        }
-
-        public ReadOnlyMemory<byte> ParseComplete()
-        {
-            const int messageLen = 5;
-            Buffer.Span[0] = (byte)MessageType.ParseComplete;
-
-            var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
-            payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
-
-            return Buffer[..messageLen];
-        }
-
-        public ReadOnlyMemory<byte> BindComplete()
-        {
-            const int messageLen = 5;
-            Buffer.Span[0] = (byte)MessageType.BindComplete;
-
-            var payload = MemoryMarshal.Cast<byte, int>(Buffer.Span[1..]);
-            payload[0] = IPAddress.HostToNetworkOrder(messageLen - 1);
-
-            return Buffer[..messageLen];
         }
 
         public void Dispose()
