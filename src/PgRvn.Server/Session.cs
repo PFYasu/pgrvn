@@ -63,17 +63,19 @@ namespace PgRvn.Server
             {
                 await HandleHandshake(protocolVersion, msgLen, reader);
             }
-            
+
+            var transaction = new Transaction();
+
             await writer.WriteAsync(messageBuilder.AuthenticationOk(), _token);
             await writer.WriteAsync(messageBuilder.ParameterStatusMessages(PgConfig.ParameterStatusList), _token);
             await writer.WriteAsync(messageBuilder.BackendKeyData(_processId, _identifier), _token);
-            await writer.WriteAsync(messageBuilder.ReadyForQuery(), _token);
-
-            var transaction = new Transaction();
+            await writer.WriteAsync(messageBuilder.ReadyForQuery(transaction.State), _token);
 
             while (_token.IsCancellationRequested == false)
             {
                 Message message = await ReadMessage(reader);
+
+                // TODO: Optimization: Send multiple messages in one packet (ParseComplete + BindComplete + ..)
 
                 switch (message.Type)
                 {
@@ -99,14 +101,13 @@ namespace PgRvn.Server
                     {
                         var response = transaction.Execute((Execute)message, messageBuilder);
                         await writer.WriteAsync(response, _token);
+                        await writer.WriteAsync(transaction.CommandComplete(messageBuilder), _token);
+                        await writer.WriteAsync(messageBuilder.ReadyForQuery(transaction.State), _token);
                         break;
                     }
                     default:
                         throw new NotSupportedException("Unsupported message type: " + (char)message.Type);
                 }
-
-                // TODO: Put this probably in Transaction.Execute
-                //await writer.WriteAsync(messageBuilder.ReadyForQuery(), _token);
             }
         }
 
@@ -288,6 +289,24 @@ namespace PgRvn.Server
                     {
                         PgObjectType = pgObjectType,
                         ObjectName = describedName
+                    };
+                }
+
+                case (byte) MessageType.Execute:
+                {
+                    var (portalName, portalNameLength) = await ReadNullTerminatedString(reader);
+                    msgLen -= portalNameLength;
+
+                    var maxRowsToReturn = await ReadInt32Async(reader);
+                    msgLen -= sizeof(int);
+
+                    if (msgLen != 0)
+                        throw new InvalidOperationException("Wrong size?");
+
+                    return new Execute
+                    {
+                        PortalName = portalName,
+                        MaxRows = maxRowsToReturn
                     };
                 }
 

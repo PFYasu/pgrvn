@@ -19,7 +19,7 @@ namespace PgRvn.Server
             _bufferOwner = MemoryPool<byte>.Shared.Rent(512);
         }
 
-        public ReadOnlyMemory<byte> ReadyForQuery(bool insideTransaction = false)
+        public ReadOnlyMemory<byte> ReadyForQuery(TransactionState transactionState)
         {
             int pos = 0;
             WriteByte((byte)MessageType.ReadyForQuery, Buffer.Span, ref pos);
@@ -28,8 +28,7 @@ namespace PgRvn.Server
             int tempPos = pos;
             pos += sizeof(int);
 
-            // TODO: 'E' if in a failed transaction block
-            WriteByte(insideTransaction ? (byte)'T' : (byte)'I', Buffer.Span, ref pos);
+            WriteByte((byte)transactionState, Buffer.Span, ref pos);
 
             // Write length
             WriteInt32(pos - sizeof(byte), Buffer.Span, ref tempPos);
@@ -102,32 +101,98 @@ namespace PgRvn.Server
             return pos;
         }
 
-        private int RowDescription(IReadOnlyList<PgField> fields, Span<byte> buffer)
+        public ReadOnlyMemory<byte> ParseComplete()
         {
-            // TODO: Make sure parametersDataTypeObjectIds length can be cast to short
             int pos = 0;
-            WriteByte((byte)MessageType.RowDescription, buffer, ref pos);
+
+            WriteByte((byte)MessageType.ParseComplete, Buffer.Span, ref pos);
+            WriteInt32(pos + sizeof(int) - sizeof(byte), Buffer.Span, ref pos);
+
+            return Buffer[..pos];
+        }
+
+        public ReadOnlyMemory<byte> BindComplete()
+        {
+            int pos = 0;
+
+            WriteByte((byte)MessageType.BindComplete, Buffer.Span, ref pos);
+            WriteInt32(pos + sizeof(int) - sizeof(byte), Buffer.Span, ref pos);
+
+            return Buffer[..pos];
+        }
+
+        public ReadOnlyMemory<byte> CommandComplete(string tag)
+        {
+            int pos = 0;
+            WriteByte((byte)MessageType.CommandComplete, Buffer.Span, ref pos);
 
             // Skip length
             int tempPos = pos;
             pos += sizeof(int);
 
-            // TODO: Make sure fields.Count can be cast to short
-            WriteInt16((short)fields.Count, buffer, ref pos);
+            WriteNullTerminatedString(tag, Buffer.Span, ref pos);
 
-            foreach (var field in fields)
+            // Write length
+            WriteInt32(pos - sizeof(byte), Buffer.Span, ref tempPos);
+
+            return Buffer[..pos];
+        }
+
+        public ReadOnlyMemory<byte> DataRows(IReadOnlyCollection<PgColumnData> columns)
+        {
+            var pos = DataRow(columns, Buffer.Span);
+            return Buffer[..pos];
+        }
+
+        private int DataRow(IReadOnlyCollection<PgColumnData> columns, Span<byte> buffer)
+        {
+            int pos = 0;
+            WriteByte((byte)MessageType.DataRow, buffer, ref pos);
+
+            // Skip length
+            int tempPos = pos;
+            pos += sizeof(int);
+
+            WriteInt16((short)columns.Count, buffer, ref pos);
+
+            foreach (var column in columns)
             {
-                WriteNullTerminatedString(field.Name, buffer, ref pos);
-                WriteInt32(field.TableObjectId, buffer, ref pos);
-                WriteInt16(field.ColumnAttributeNumber, buffer, ref pos);
-                WriteInt32(field.DataTypeObjectId, buffer, ref pos);
-                WriteInt16(field.DataTypeSize, buffer, ref pos);
-                WriteInt32(field.TypeModifier, buffer, ref pos);
-                WriteInt16(field.FormatCode, buffer, ref pos);
+                WriteInt32(column.IsNull ? -1 : column.Data.Length, buffer, ref pos);
+                WriteBytes(column.Data, buffer, ref pos);
             }
 
+            // Write length
             WriteInt32(pos - sizeof(byte), buffer, ref tempPos);
+
             return pos;
+        }
+
+        public ReadOnlyMemory<byte> RowDescription(IReadOnlyCollection<PgColumn> columns)
+        {
+            // TODO: Make sure parametersDataTypeObjectIds length can be cast to short
+            int pos = 0;
+            WriteByte((byte)MessageType.RowDescription, Buffer.Span, ref pos);
+
+            // Skip length
+            int tempPos = pos;
+            pos += sizeof(int);
+
+            // TODO: Make sure columns.Count can be cast to short
+            WriteInt16((short)columns.Count, Buffer.Span, ref pos);
+
+            foreach (var field in columns)
+            {
+                WriteNullTerminatedString(field.Name, Buffer.Span, ref pos);
+                WriteInt32(field.TableObjectId, Buffer.Span, ref pos);
+                WriteInt16(field.ColumnIndex, Buffer.Span, ref pos);
+                WriteInt32(field.TypeObjectId, Buffer.Span, ref pos);
+                WriteInt16(field.DataTypeSize, Buffer.Span, ref pos);
+                WriteInt32(field.TypeModifier, Buffer.Span, ref pos);
+                WriteInt16((short)field.FormatCode, Buffer.Span, ref pos);
+            }
+
+            WriteInt32(pos - sizeof(byte), Buffer.Span, ref tempPos);
+            return Buffer[..pos];
         }
 
         private int ParameterDescription(IReadOnlyList<int> parametersDataTypeObjectIds, Span<byte> buffer)
@@ -152,24 +217,10 @@ namespace PgRvn.Server
             return pos;
         }
 
-        public ReadOnlyMemory<byte> ParseComplete()
+        private void WriteBytes(ReadOnlyMemory<byte> value, Span<byte> buffer, ref int pos)
         {
-            int pos = 0;
-
-            WriteByte((byte)MessageType.ParseComplete, Buffer.Span, ref pos);
-            WriteInt32(pos + sizeof(int) - sizeof(byte), Buffer.Span, ref pos);
-
-            return Buffer[..pos];
-        }
-
-        public ReadOnlyMemory<byte> BindComplete()
-        {
-            int pos = 0;
-
-            WriteByte((byte)MessageType.BindComplete, Buffer.Span, ref pos);
-            WriteInt32(pos + sizeof(int) - sizeof(byte), Buffer.Span, ref pos);
-
-            return Buffer[..pos];
+            value.Span.CopyTo(buffer[pos..]);
+            pos += value.Length;
         }
 
         private void WriteNullTerminatedString(string value, Span<byte> buffer, ref int pos)

@@ -24,6 +24,8 @@ namespace PgRvn.Server
         BindComplete = (byte)'2',
         ParameterDescription = (byte)'t',
         RowDescription = (byte)'T',
+        DataRow = (byte)'D',
+        CommandComplete = (byte)'C',
     }
 
     public enum PgObjectType : byte
@@ -32,7 +34,7 @@ namespace PgRvn.Server
         Portal = (byte)'P'
     }
 
-    public class PgField
+    public class PgColumn
     {
         public string Name;
         /// <summary>
@@ -42,11 +44,23 @@ namespace PgRvn.Server
         /// <summary>
         /// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero.
         /// </summary>
-        public short ColumnAttributeNumber;
-        public int DataTypeObjectId;
+        public short ColumnIndex;
+        public int TypeObjectId;
         public short DataTypeSize;
         public int TypeModifier;
-        public short FormatCode;
+        public PgFormat FormatCode;
+    }
+
+    public class PgColumnData
+    {
+        public bool IsNull = false;
+        public ReadOnlyMemory<byte> Data;
+    }
+
+    public enum PgFormat : short
+    {
+        Text = 0,
+        Binary = 1
     }
 
     public abstract class Message
@@ -86,5 +100,7 @@ namespace PgRvn.Server
     public class Execute : Message
     {
         public override MessageType Type => MessageType.Execute;
+        public string PortalName;
+        public int MaxRows;
     }
 }
