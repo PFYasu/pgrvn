@@ -30,7 +30,6 @@ namespace Tryouts
 
         static void Main(string[] args)
         {
-
             try
             {
                 var server = new PgRvnServer();
@@ -44,7 +43,7 @@ namespace Tryouts
                 return;
             }
 
-            var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=BookStore";
+            var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=BookStore;ServerCompatibilityMode=NoTypeLoading";
             //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore";
 
             using var conn = new NpgsqlConnection(connString);

@@ -29,49 +29,67 @@ namespace PgRvn.Server
 
         public PgColumnData[] Execute(TSQLStatement statement, out int rowsOperated)
         {
-            //if (statement.AsSelect.From == null)
             int offset = 1;
-            return SelectField(statement, ref offset, out var _, out rowsOperated);
+            return Process(statement, ref offset, out var _, out rowsOperated);
         }
 
         public PgColumn[] Describe(TSQLStatement statement)
         {
             int offset = 1;
-            SelectField(statement, ref offset, out var columns, out _);
+            Process(statement, ref offset, out var columns, out _);
             return columns;
         }
 
-        private static PgColumnData[] SelectField(TSQLStatement stmt, ref int offset, out PgColumn[] columns, out int rowsOperated)
+        private static PgColumnData[] Process(TSQLStatement stmt, ref int offset, out PgColumn[] columns, out int rowsOperated)
         {
-            columns = Array.Empty<PgColumn>();
-
-            var identifier = stmt.AsSelect.Select.Tokens[offset];
-            switch (identifier.Type)
+            // Process SELECT query
+            if (stmt.AsSelect != null)
             {
-                case TSQLTokenType.Identifier:
-                    if (offset + 1 < stmt.AsSelect.Select.Tokens.Count)
+                // SELECT without FROM
+                if (stmt.AsSelect.From == null)
+                {
+                    var identifier = stmt.AsSelect.Select.Tokens[offset];
+                    switch (identifier.Type)
                     {
-                        if (stmt.AsSelect.Select.Tokens[offset + 1].Text == "(")
-                        {
-                            offset += 2;
-                            var result = methods[identifier.Text](stmt.AsSelect.Select.Tokens, ref offset, out var outColumns);
-                            columns = outColumns;
-                            rowsOperated = 1;
-                            return new []
+                        case TSQLTokenType.Identifier:
+                            if (offset + 1 < stmt.AsSelect.Select.Tokens.Count)
                             {
-                                new PgColumnData
+                                if (stmt.AsSelect.Select.Tokens[offset + 1].Text == "(")
                                 {
-                                    Data = result
+                                    offset += 2;
+                                    var result = methods[identifier.Text](stmt.AsSelect.Select.Tokens, ref offset,
+                                        out var outColumns);
+                                    columns = outColumns;
+                                    rowsOperated = 1;
+                                    return new[]
+                                    {
+                                        new PgColumnData
+                                        {
+                                            Data = result
+                                        }
+                                    };
                                 }
-                            };
-                        }
+                            }
+
+                            break;
+                        case TSQLTokenType.MultilineComment:
+                        case TSQLTokenType.IncompleteComment:
+                        case TSQLTokenType.SingleLineComment:
+                            offset++;
+                            break;
+                        default:
+                            throw new NotSupportedException(identifier.ToString());
                     }
-                    break;
-                default:
-                    throw new NotSupportedException(identifier.ToString());
+                }
+                else
+                {
+                    // SELECT with FROM
+
+                }
             }
 
             rowsOperated = 0;
+            columns = Array.Empty<PgColumn>();
             return Array.Empty<PgColumnData>();
         }
 
