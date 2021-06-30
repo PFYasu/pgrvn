@@ -53,6 +53,48 @@ namespace PgRvn.Server
             return Buffer[..pos];
         }
 
+        /// <summary>
+        /// Creates an error response message.
+        /// </summary>
+        /// <param name="severity">A Postgres severity string. See <see cref="PgSeverity"/></param>
+        /// <param name="errorCode">A Postgres error code (SqlState). See <see cref="PgErrorCodes"/></param>
+        /// <param name="errorMessage">Error message</param>
+        /// <param name="description">Error description</param>
+        /// <returns>ErrorResponse message</returns>
+        public ReadOnlyMemory<byte> ErrorResponse(string severity, string errorCode, string errorMessage, string description=null)
+        {
+            int pos = 0;
+            WriteByte((byte)MessageType.ErrorResponse, Buffer.Span, ref pos);
+
+            // Skip length
+            int tempPos = pos;
+            pos += sizeof(int);
+
+            WriteByte((byte)PgErrorField.Severity, Buffer.Span, ref pos);
+            WriteNullTerminatedString(severity, Buffer.Span, ref pos);
+
+            WriteByte((byte)PgErrorField.SeverityNotLocalized, Buffer.Span, ref pos);
+            WriteNullTerminatedString(severity, Buffer.Span, ref pos);
+
+            WriteByte((byte)PgErrorField.SqlState, Buffer.Span, ref pos);
+            WriteNullTerminatedString(errorCode, Buffer.Span, ref pos);
+
+            WriteByte((byte)PgErrorField.Message, Buffer.Span, ref pos);
+            WriteNullTerminatedString(errorMessage, Buffer.Span, ref pos);
+
+            if (description != null)
+            {
+                WriteByte((byte)PgErrorField.Description, Buffer.Span, ref pos);
+                WriteNullTerminatedString(description, Buffer.Span, ref pos);
+            }
+
+            // TODO: Support writing more fields, see: https://www.postgresql.org/docs/current/protocol-error-fields.html
+
+            // Write length
+            WriteInt32(pos - sizeof(byte), Buffer.Span, ref tempPos);
+
+            return Buffer[..pos];
+        }
 
         public ReadOnlyMemory<byte> BackendKeyData(int processId, int sessionId)
         {

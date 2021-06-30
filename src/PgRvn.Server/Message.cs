@@ -19,6 +19,7 @@ namespace PgRvn.Server
         BackendKeyData = (byte)'K',
         AuthenticationOk = (byte)'R',
         ReadyForQuery = (byte)'Z',
+        ErrorResponse = (byte)'E',
 
         ParseComplete = (byte)'1',
         BindComplete = (byte)'2',
@@ -32,6 +33,31 @@ namespace PgRvn.Server
     {
         PreparedStatement = (byte)'S',
         Portal = (byte)'P'
+    }
+
+    /// <remarks>
+    /// See <see href="https://www.postgresql.org/docs/current/protocol-error-fields.html"/>
+    /// </remarks>
+    public enum PgErrorField : byte
+    {
+        Severity = (byte)'S',
+        SeverityNotLocalized = (byte)'V',
+        SqlState = (byte)'C',
+        Message = (byte)'M',
+        Description = (byte)'D',
+        Hint = (byte)'H',
+        Position = (byte)'P',
+        PositionInternal = (byte)'p',
+        QueryInternal = (byte)'q',
+        Where = (byte)'W',
+        SchemaName = (byte)'s',
+        TableName = (byte)'t',
+        ColumnName = (byte)'c',
+        DataTypeName = (byte)'d',
+        ConstraintName = (byte)'n',
+        FileName = (byte)'f',
+        Line = (byte)'L',
+        Routine = (byte)'R'
     }
 
     public class PgColumn
@@ -63,6 +89,21 @@ namespace PgRvn.Server
         Binary = 1
     }
 
+    public class PgSeverity
+    {
+        // In ErrorResponse messages
+        public const string Error = "ERROR";
+        public const string Fatal = "FATAL";
+        public const string Panic = "PANIC";
+
+        // In NoticeResponse messages
+        public const string Warning = "WARNING";
+        public const string Notice = "NOTICE";
+        public const string Debug = "DEBUG";
+        public const string Info = "INFO";
+        public const string Log = "LOG";
+    }
+
     public abstract class Message
     {
         public abstract MessageType Type { get; }
@@ -73,7 +114,7 @@ namespace PgRvn.Server
         public override MessageType Type => MessageType.Parse;
         public string StatementName;
         public string Query;
-        public int[] Parameters;
+        public int[] ParametersDataTypeOID;
     }
 
     public class Bind : Message

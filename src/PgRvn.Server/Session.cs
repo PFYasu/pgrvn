@@ -73,7 +73,7 @@ namespace PgRvn.Server
 
             while (_token.IsCancellationRequested == false)
             {
-                Message message = await ReadMessage(reader);
+                var message = await ReadMessage(reader);
 
                 // TODO: Optimization: Send multiple messages in one packet (ParseComplete + BindComplete + ..)
 
@@ -126,49 +126,6 @@ namespace PgRvn.Server
             return protocolVersion;
         }
 
-        private void ExecuteStatement(TSQLStatement stmt)
-        {
-            if (stmt.AsSelect.From == null)
-            {
-                var offset = 1;
-                SelectField(stmt, ref offset);
-            }
-        }
-
-        private static void SelectField(TSQLStatement stmt, ref int offset)
-        {
-            var identifier = stmt.AsSelect.Select.Tokens[offset];
-            switch (identifier.Type)
-            {
-                case TSQLTokenType.Identifier:
-                    if (offset + 1 < stmt.AsSelect.Select.Tokens.Count)
-                    {
-                        if (stmt.AsSelect.Select.Tokens[offset + 1].Text == "(")
-                        {
-                            offset += 2;
-                            var result = methods[identifier.Text](stmt.AsSelect.Select.Tokens, ref offset); 
-                        }
-                    }
-                    break;
-                default:
-                    throw new NotSupportedException(identifier.ToString());
-            }
-        }
-
-        private delegate object SqlMethodDelegate(List<TSQLToken> tokens, ref int offset);
-
-        private static Dictionary<string, SqlMethodDelegate> methods = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["version"] = VersionMethod
-        };
-
-        private static object VersionMethod(List<TSQLToken> tokens, ref int offset)
-        {
-            offset++; // todo: validate
-            return "0.10-alpga2";
-        }
-        
-
         private async Task<Message> ReadMessage(PipeReader reader)
         {
             var msgType = await ReadByteAsync(reader);
@@ -194,11 +151,6 @@ namespace PgRvn.Server
                         msgLen -= sizeof(int);
                     }
 
-                    // Parse SQL
-                    //var tsqlStatements = TSQLStatementReader.ParseStatements(query);
-                    //int offset = 1;
-                    //SelectField(tsqlStatements[0], ref offset);
-
                     if (msgLen != 0)
                         throw new InvalidOperationException("Wrong size?");
 
@@ -206,7 +158,7 @@ namespace PgRvn.Server
                     {
                         StatementName = statementName,
                         Query = query,
-                        Parameters = parameters
+                        ParametersDataTypeOID = parameters
                     };
                 }
 
@@ -292,7 +244,7 @@ namespace PgRvn.Server
                     };
                 }
 
-                case (byte) MessageType.Execute:
+                case (byte)MessageType.Execute:
                 {
                     var (portalName, portalNameLength) = await ReadNullTerminatedString(reader);
                     msgLen -= portalNameLength;
