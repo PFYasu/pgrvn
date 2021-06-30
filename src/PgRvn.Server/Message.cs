@@ -114,7 +114,15 @@ namespace PgRvn.Server
         public override MessageType Type => MessageType.Parse;
         public string StatementName;
         public string Query;
-        public int[] ParametersDataTypeOID;
+
+        /// <summary>
+        /// The number of parameter data types specified (can be zero).
+        /// </summary>
+        /// <remarks>
+        /// Note that this is not an indication of the number of parameters that might appear
+        /// in the query string, only the number that the frontend wants to prespecify types for.
+        /// </remarks>
+        public int[] ParametersDataTypeOid;
     }
 
     public class Bind : Message

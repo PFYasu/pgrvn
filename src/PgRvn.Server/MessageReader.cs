@@ -50,7 +50,7 @@
 //                     {
 //                         StatementName = statementName,
 //                         Query = query,
-//                         ParametersDataTypeOID = parameters
+//                         ParametersDataTypeOid = parameters
 //                     };
 //
 //                 case (char)MessageType.Bind:

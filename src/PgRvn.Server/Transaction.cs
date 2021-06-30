@@ -87,31 +87,30 @@ namespace PgRvn.Server
             if (IsTransactionInactive(messageBuilder, out var errorResponse))
                 return errorResponse;
 
-            // TODO: Send response
-            if (message.PgObjectType == PgObjectType.Portal)
+            try
             {
-                return messageBuilder.RowDescription(new []
-                {
-                    new PgColumn
-                    {
-                        Name = "?column?",
-                        TableObjectId = 0,
-                        ColumnIndex = 0,
-                        TypeObjectId = 23, // int
-                        DataTypeSize = sizeof(int),
-                        TypeModifier = -1,
-                        FormatCode = PgFormat.Binary
-                    }
-                });
-            }
-            else if (message.PgObjectType == PgObjectType.PreparedStatement)
-            {
-            }
-            else
-            {
-            }
+                var columns = _sqlHandler.Describe(_statement);
 
-            return ReadOnlyMemory<byte>.Empty;
+                switch (message.PgObjectType)
+                {
+                    case PgObjectType.Portal:
+                        return messageBuilder.RowDescription(columns);
+                    case PgObjectType.PreparedStatement:
+                        throw new NotImplementedException("Prepared statements handling aren't implemented yet.");
+                    default:
+                        throw new InvalidOperationException("Unsupported PgObjectType.");
+                }
+            }
+            catch (Exception e)
+            {
+                // TODO: Handle error
+                throw;
+                // State = TransactionState.Failed;
+                // return messageBuilder.ErrorResponse(PgSeverity.Error,
+                //     PgErrorCodes.,
+                //     "Describe phase failed.",
+                //     e.Message);
+            }
         }
 
         public ReadOnlyMemory<byte> Execute(Message message, MessageBuilder messageBuilder)
@@ -119,18 +118,8 @@ namespace PgRvn.Server
             if (IsTransactionInactive(messageBuilder, out var errorResponse))
                 return errorResponse;
 
-            Memory<byte> buffer = new byte[sizeof(int)];
-            var asInts = MemoryMarshal.Cast<byte, int>(buffer.Span);
-            asInts[0] = IPAddress.HostToNetworkOrder(1);
-
-            _rowsOperated = 1;
-            return messageBuilder.DataRows(new []
-            {
-                new PgColumnData
-                {
-                    Data = buffer
-                }
-            });
+            var data = _sqlHandler.Execute(_statement, out _rowsOperated);
+            return messageBuilder.DataRows(data);
         }
 
         public ReadOnlyMemory<byte> CommandComplete(MessageBuilder messageBuilder)
