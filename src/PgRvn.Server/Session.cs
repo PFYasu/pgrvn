@@ -77,6 +77,12 @@ namespace PgRvn.Server
 
                 // TODO: Optimization: Send multiple messages in one packet (ParseComplete + BindComplete + ..)
 
+                // If transaction failed, skip any messages until Sync is reached
+                if (transaction.State == TransactionState.Failed && message.Type != MessageType.Sync)
+                {
+                    continue;
+                }
+
                 switch (message.Type)
                 {
                     case MessageType.Parse:
@@ -102,7 +108,12 @@ namespace PgRvn.Server
                         var response = transaction.Execute((Execute)message, messageBuilder);
                         await writer.WriteAsync(response, _token);
                         await writer.WriteAsync(transaction.CommandComplete(messageBuilder), _token);
-                        await writer.WriteAsync(messageBuilder.ReadyForQuery(transaction.State), _token);
+                        break;
+                    }
+                    case MessageType.Sync:
+                    {
+                        // TODO: Postgres seems to only send ReadyForQuery after there are no more Parse messages in the queue, unlike this
+                        await writer.WriteAsync(transaction.Sync(messageBuilder), _token);
                         break;
                     }
                     default:
@@ -260,6 +271,14 @@ namespace PgRvn.Server
                         PortalName = portalName,
                         MaxRows = maxRowsToReturn
                     };
+                }
+
+                case (byte) MessageType.Sync:
+                {
+                    if (msgLen != 0)
+                        throw new InvalidOperationException("Wrong size?");
+
+                    return new Sync();
                 }
 
                 default:

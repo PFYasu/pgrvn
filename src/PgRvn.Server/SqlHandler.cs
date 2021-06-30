@@ -102,7 +102,9 @@ namespace PgRvn.Server
             };
 
             offset++;
-            return Encoding.ASCII.GetBytes("0.10-alpga2");
+
+            // 0.10-alpga2
+            return Encoding.ASCII.GetBytes("PostgreSQL 13.3, compiled by Visual C++ build 1914, 64-bit");
         }
     }
 }

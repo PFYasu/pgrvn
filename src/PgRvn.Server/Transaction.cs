@@ -87,6 +87,8 @@ namespace PgRvn.Server
             if (IsTransactionInactive(messageBuilder, out var errorResponse))
                 return errorResponse;
 
+            // TODO: Send NoData if portal does not contain a query that will return rows
+
             try
             {
                 var columns = _sqlHandler.Describe(_statement);
@@ -169,6 +171,12 @@ namespace PgRvn.Server
 
             State = TransactionState.Idle;
             return messageBuilder.CommandComplete($"{tag} {_rowsOperated}");
+        }
+
+        public ReadOnlyMemory<byte> Sync(MessageBuilder messageBuilder)
+        {
+            State = TransactionState.Idle;
+            return messageBuilder.ReadyForQuery(State);
         }
 
         private bool IsTransactionInactive(MessageBuilder messageBuilder, out ReadOnlyMemory<byte> errorResponse)

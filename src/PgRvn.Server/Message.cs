@@ -13,6 +13,7 @@ namespace PgRvn.Server
         Bind = (byte)'B',
         Describe = (byte)'D',
         Execute = (byte)'E',
+        Sync = (byte)'S',
 
         // Sent
         ParameterStatus = (byte)'S',
@@ -151,5 +152,10 @@ namespace PgRvn.Server
         public override MessageType Type => MessageType.Execute;
         public string PortalName;
         public int MaxRows;
+    }
+
+    public class Sync : Message
+    {
+        public override MessageType Type => MessageType.Sync;
     }
 }
