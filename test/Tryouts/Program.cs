@@ -11,7 +11,7 @@ namespace Tryouts
     {
         static void InsertData(NpgsqlConnection conn)
         {
-            using (var cmd = new NpgsqlCommand("INSERT INTO \"Customers\" (\"First Name\") VALUES (@p)", conn))
+            using (var cmd = new NpgsqlCommand("INSERT INTO \"Customers\" (\"First Name\") VALUES (@p, @x)", conn))
             {
                 cmd.Parameters.AddWithValue("p", NpgsqlDbType.Name, "Hello world");
                 cmd.ExecuteNonQuery();
@@ -60,19 +60,19 @@ namespace Tryouts
             using var conn = new NpgsqlConnection(connString);
             conn.Open();
             
-            Select(conn, "from Employees");
-            Select(conn, "from Employees select LastName, FirstName");
-            Select(conn, "from index 'Orders/Totals'"); // map index
-            Select(conn, "from index 'Orders/ByCompany'"); // map/reduce index
-            Select(conn, "from index 'Orders/ByCompany' order by Count as long desc select Company, Count"); // map/reduce index
-            Select(conn, "from Orders select Company, OrderedAt, Freight"); // map index projection
-            Select(conn, "from index 'Orders/Totals' select Company, OrderedAt, Freight"); // map index projection
-            Select(conn, "from Employees as e select { FullName: e.FirstName + ' ' + e.LastName } "); // projection via js
-            Select(conn, "from Employees where Address.City = $city", new Dictionary<string, object>
+            // Select(conn, "from Employees");
+            // Select(conn, "from Employees select LastName, FirstName");
+            // Select(conn, "from index 'Orders/Totals'"); // map index
+            // Select(conn, "from index 'Orders/ByCompany'"); // map/reduce index
+            // Select(conn, "from index 'Orders/ByCompany' order by Count as long desc select Company, Count"); // map/reduce index
+            // Select(conn, "from Orders select Company, OrderedAt, Freight"); // map index projection
+            // Select(conn, "from index 'Orders/Totals' select Company, OrderedAt, Freight"); // map index projection
+            // Select(conn, "from Employees as e select { FullName: e.FirstName + ' ' + e.LastName } "); // projection via js
+            Select(conn, "from Employees where Address.City = @city", new Dictionary<string, object>
             {
                 ["city"] = "London"
             }); // with args
-            Select(conn, "from Orders include Employee"); // with include
+            // Select(conn, "from Orders include Employee"); // with include
 
 
             // out of scope for now: graph queries

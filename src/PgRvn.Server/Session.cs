@@ -27,7 +27,7 @@ namespace PgRvn.Server
         private readonly int _processId;
         private readonly DocumentStore _docStore;
 
-        public Session(TcpClient client, CancellationToken token, int identifier, int processId, Raven.Client.Documents.DocumentStore docStore)
+        public Session(TcpClient client, CancellationToken token, int identifier, int processId, DocumentStore docStore)
         {
             _client = client;
             _token = token;
@@ -67,7 +67,7 @@ namespace PgRvn.Server
                 await HandleHandshake(protocolVersion, msgLen, reader);
             }
 
-            var transaction = new Transaction();
+            var transaction = new Transaction(_docStore);
 
             await writer.WriteAsync(messageBuilder.AuthenticationOk(), _token);
             await writer.WriteAsync(messageBuilder.ParameterStatusMessages(PgConfig.ParameterStatusList), _token);

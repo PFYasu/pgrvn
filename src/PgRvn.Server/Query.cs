@@ -17,7 +17,7 @@ namespace PgRvn.Server
         public Dictionary<string, object> Parameters;
         private List<BlittableJsonReaderObject> _results;
         public IAsyncDocumentSession Session;
-        public Dictionary<string, PgColumn> Columns = new Dictionary<string, PgColumn>();
+        public Dictionary<string, PgColumn> Columns = new();
 
 
         public async Task Init(MessageBuilder builder, PipeWriter writer, CancellationToken token)
