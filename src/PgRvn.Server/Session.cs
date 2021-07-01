@@ -27,7 +27,7 @@ namespace PgRvn.Server
         private readonly int _processId;
         private readonly DocumentStore _docStore;
 
-        public Session(TcpClient client, CancellationToken token, int identifier, int processId, Raven.Client.Documents.DocumentStore docStore)
+        public Session(TcpClient client, CancellationToken token, int identifier, int processId, DocumentStore docStore)
         {
             _client = client;
             _token = token;

@@ -68,6 +68,8 @@ namespace PgRvn.Server
             //    in a function's parameter list, it is effectively ignored. For example, a function call such as foo($1,$2,$3,$4)
             //    could match a function with two IN and two OUT arguments, if $3 and $4 are specified as having type void.
 
+            // TODO: We currently ignore parameter data types if they are sent. This is probably fine.
+
             // TODO: Pass message.Parameters
             CurrentQuery?.Session?.Dispose();
             CurrentQuery = new Query
@@ -89,6 +91,12 @@ namespace PgRvn.Server
 
             // TODO: Handle parameters
             CurrentQuery.Parameters ??= new Dictionary<string, object>();
+
+            foreach (var parameter in message.Parameters)
+            {
+                //CurrentQuery.Parameters.Add(parameter);
+            }
+            //CurrentQuery.Parameters.Add();
 
             // TODO: Verify data, bind parameters using _parseMessage and return ErrorMessage if needed
 
