@@ -4,6 +4,8 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO.Pipelines;
+using System.Linq;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -41,7 +43,7 @@ namespace PgRvn.Server
 
                     if (_hasId)
                     {
-                        if(result.TryGet("@metadata", out BlittableJsonReaderObject metadata) &&
+                        if (result.TryGet("@metadata", out BlittableJsonReaderObject metadata) &&
                             metadata.TryGet("@id", out string id))
                         {
                             row[0] = Encoding.UTF8.GetBytes(id);
@@ -61,8 +63,8 @@ namespace PgRvn.Server
                             (BlittableJsonToken.Boolean, PgTypeOIDs.Bool) => (bool)prop.Value ? TrueBuffer : FalseBuffer,
                             (BlittableJsonToken.CompressedString, PgTypeOIDs.Text) => Encoding.UTF8.GetBytes(prop.Value.ToString()),
                             (BlittableJsonToken.EmbeddedBlittable, PgTypeOIDs.Json) => Encoding.UTF8.GetBytes(prop.Value.ToString()),
-                            (BlittableJsonToken.Integer, PgTypeOIDs.Int8) => BitConverter.GetBytes((long)prop.Value),
-                            (BlittableJsonToken.LazyNumber, PgTypeOIDs.Int8) => BitConverter.GetBytes((double)(LazyNumberValue)prop.Value),
+                            (BlittableJsonToken.Integer, PgTypeOIDs.Int8) => BitConverter.GetBytes(IPAddress.HostToNetworkOrder((long)prop.Value)),
+                            (BlittableJsonToken.LazyNumber, PgTypeOIDs.Float8) => BitConverter.GetBytes((double)(LazyNumberValue)prop.Value).Reverse().ToArray(),
                             (BlittableJsonToken.String, PgTypeOIDs.Text) => Encoding.UTF8.GetBytes(prop.Value.ToString()),
                             (BlittableJsonToken.StartArray, PgTypeOIDs.Json) => Encoding.UTF8.GetBytes(prop.Value.ToString()),
                             (BlittableJsonToken.StartObject, PgTypeOIDs.Json) => Encoding.UTF8.GetBytes(prop.Value.ToString()),
@@ -70,7 +72,7 @@ namespace PgRvn.Server
                             _ => null
                         };
 
-                        if(value == null)
+                        if (value == null)
                         {
                             continue;
                         }
@@ -78,9 +80,9 @@ namespace PgRvn.Server
                         result.Modifications.Remove(col.Key);
                     }
 
-                    var modified = Session.Advanced.Context.ReadObject(result, "renew");
-                    if(modified.Count != 0)
+                    if (result.Modifications.Removals.Count != result.Count)
                     {
+                        var modified = Session.Advanced.Context.ReadObject(result, "renew");
                         row[^1] = Encoding.UTF8.GetBytes(modified.ToString());
                     }
                     await writer.WriteAsync(builder.DataRow(row[..Columns.Count]), token);
@@ -110,12 +112,12 @@ namespace PgRvn.Server
 
         private ICollection<PgColumn> GenerateSchema()
         {
-            if (_results.Count == 0) 
+            if (_results.Count == 0)
                 return Array.Empty<PgColumn>();
 
             var sample = _results[0];
-
-            if(sample.TryGet("@metadata", out BlittableJsonReaderObject metadata) && metadata.TryGet("@id", out string _))
+            
+            if (sample.TryGet("@metadata", out BlittableJsonReaderObject metadata) && metadata.TryGet("@id", out string _))
             {
                 _hasId = true;
                 Columns["id()"] = new PgColumn
@@ -134,6 +136,9 @@ namespace PgRvn.Server
             for (int i = 0; i < sample.Count; i++)
             {
                 sample.GetPropertyByIndex(i, ref prop);
+                if (prop.Name == "@metadata")
+                    continue;
+
                 var (type, size, format) = (prop.Token & BlittableJsonReaderBase.TypesMask) switch
                 {
                     BlittableJsonToken.Boolean => (PgTypeOIDs.Bool, sizeof(bool), PgFormat.Binary),
@@ -143,8 +148,8 @@ namespace PgRvn.Server
                     BlittableJsonToken.LazyNumber => (PgTypeOIDs.Float8, sizeof(double), PgFormat.Binary),
                     BlittableJsonToken.Null => (PgTypeOIDs.Json, -1, PgFormat.Text),
                     BlittableJsonToken.String => (PgTypeOIDs.Text, -1, PgFormat.Text),
-                    BlittableJsonToken.StartArray => (PgTypeOIDs.Json,-1, PgFormat.Text),
-                    BlittableJsonToken.StartObject => (PgTypeOIDs.Json,-1, PgFormat.Text),
+                    BlittableJsonToken.StartArray => (PgTypeOIDs.Json, -1, PgFormat.Text),
+                    BlittableJsonToken.StartObject => (PgTypeOIDs.Json, -1, PgFormat.Text),
                     _ => throw new NotSupportedException()
                 };
                 Columns[prop.Name] = new PgColumn
@@ -159,12 +164,24 @@ namespace PgRvn.Server
                 };
             }
 
+            Columns["@metadata"] = new PgColumn
+            {
+                Name = "@metadata",
+                FormatCode = PgFormat.Text,
+                TypeModifier = -1,
+                TypeObjectId = PgTypeOIDs.Json,
+                DataTypeSize = -1,
+                ColumnIndex = (short)Columns.Count,
+                TableObjectId = 0
+            };
+
+
             Columns["json()"] = new PgColumn
             {
                 Name = "json()",
                 FormatCode = PgFormat.Text,
                 TypeModifier = -1,
-                TypeObjectId = PgTypeOIDs.Text,
+                TypeObjectId = PgTypeOIDs.Json,
                 DataTypeSize = -1,
                 ColumnIndex = (short)Columns.Count,
                 TableObjectId = 0
