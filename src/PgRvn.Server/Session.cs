@@ -67,7 +67,7 @@ namespace PgRvn.Server
                 await HandleHandshake(protocolVersion, msgLen, reader);
             }
 
-            var transaction = new Transaction();
+            var transaction = new Transaction(_docStore);
 
             await writer.WriteAsync(messageBuilder.AuthenticationOk(), _token);
             await writer.WriteAsync(messageBuilder.ParameterStatusMessages(PgConfig.ParameterStatusList), _token);

@@ -22,6 +22,7 @@ namespace PgRvn.Server
     class Transaction
     {
         private TransactionState _state = TransactionState.Idle;
+        private int _rowsOperated;
         public TransactionState State
         {
             get => _state;
@@ -39,7 +40,6 @@ namespace PgRvn.Server
 
         public IDocumentStore DocumentStore { get; }
 
-        private int _rowsOperated = 0;
 
         public Query CurrentQuery;
 
@@ -73,7 +73,7 @@ namespace PgRvn.Server
             CurrentQuery = new Query
             {
                 QueryText = message.Query,
-                Session = DocumentStore.OpenSession()
+                Session = DocumentStore.OpenAsyncSession()
             };
 
             // TODO: Verify data and return ErrorMessage if needed (and change transaction state)

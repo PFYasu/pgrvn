@@ -78,13 +78,6 @@ namespace PgRvn.Server
         public PgFormat FormatCode;
     }
 
-    public class PgColumnData
-    {
-        public static readonly PgColumnData Null = new PgColumnData {IsNull = true, Data = ReadOnlyMemory<byte>.Empty};
-        public bool IsNull = false;
-        public ReadOnlyMemory<byte> Data;
-    }
-
     public enum PgFormat : short
     {
         Text = 0,

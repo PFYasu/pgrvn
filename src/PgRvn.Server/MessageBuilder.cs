@@ -16,7 +16,7 @@ namespace PgRvn.Server
 
         public MessageBuilder()
         {
-            _bufferOwner = MemoryPool<byte>.Shared.Rent(512);
+            _bufferOwner = MemoryPool<byte>.Shared.Rent(32*1024); // TODO: need to manage sizes here
         }
 
         public ReadOnlyMemory<byte> ReadyForQuery(TransactionState transactionState)
@@ -180,13 +180,13 @@ namespace PgRvn.Server
             return Buffer[..pos];
         }
 
-        public ReadOnlyMemory<byte> DataRow(IReadOnlyCollection<PgColumnData> columns)
+        public ReadOnlyMemory<byte> DataRow(Span<ReadOnlyMemory<byte>?> columns)
         {
             var pos = DataRow(columns, Buffer.Span);
             return Buffer[..pos];
         }
 
-        private int DataRow(IReadOnlyCollection<PgColumnData> columns, Span<byte> buffer)
+        private int DataRow(Span<ReadOnlyMemory<byte>?> columns, Span<byte> buffer)
         {
             int pos = 0;
             WriteByte((byte)MessageType.DataRow, buffer, ref pos);
@@ -195,12 +195,12 @@ namespace PgRvn.Server
             int tempPos = pos;
             pos += sizeof(int);
 
-            WriteInt16((short)columns.Count, buffer, ref pos);
+            WriteInt16((short)columns.Length, buffer, ref pos);
 
             foreach (var column in columns)
             {
-                WriteInt32(column.IsNull ? -1 : column.Data.Length, buffer, ref pos);
-                WriteBytes(column.Data, buffer, ref pos);
+                WriteInt32(column?.Length ?? -1, buffer, ref pos);
+                WriteBytes(column?? ReadOnlyMemory<byte>.Empty, buffer, ref pos);
             }
 
             // Write length
