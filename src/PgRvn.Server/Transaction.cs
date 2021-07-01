@@ -75,13 +75,18 @@ namespace PgRvn.Server
             if (IsTransactionInactive(messageBuilder, out var errorResponse))
                 return errorResponse;
 
-            // TODO: Handle parameters
             CurrentQuery.Parameters ??= new Dictionary<string, object>();
 
             int i = 0;
             foreach (var parameter in message.Parameters)
             {
-                object processedParameter = CurrentQuery.ParametersDataTypes[i] switch
+                int dataType = 0;
+                if (i < CurrentQuery.ParametersDataTypes.Length)
+                {
+                    dataType = CurrentQuery.ParametersDataTypes[i];
+                }
+
+                object processedParameter = dataType switch
                 {
                     PgTypeOIDs.Bool => Query.TrueBuffer.SequenceEqual(parameter),
                     PgTypeOIDs.Text => Encoding.UTF8.GetString(parameter),
@@ -91,11 +96,11 @@ namespace PgRvn.Server
                     _ => parameter
                 };
 
-                CurrentQuery.Parameters.Add($"p{i+1}", processedParameter); // TODO: cast parameter to the correct type
+                CurrentQuery.Parameters.Add($"p{i+1}", processedParameter);
                 i++;
             }
 
-            // TODO: Verify data, bind parameters using _parseMessage and return ErrorMessage if needed
+            // TODO: return ErrorMessage if needed
 
             return messageBuilder.BindComplete();
         }

@@ -93,6 +93,7 @@ namespace PgRvn.Server
             {
                 ArrayPool<ReadOnlyMemory<byte>?>.Shared.Return(row);
             }
+
             await writer.WriteAsync(builder.CommandComplete($"SELECT {_results.Count}"), token);
         }
 
