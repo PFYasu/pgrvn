@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Raven.Client.Documents.Session;
+using Sparrow.Json;
+using System;
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Runtime.InteropServices;
@@ -13,25 +15,16 @@ namespace PgRvn.Server
         public string QueryText;
 
         public Dictionary<string, object> Parameters;
-        private List<Dictionary<string, object>> _results;
+        private List<BlittableJsonReaderObject> _results;
+        public IAsyncDocumentSession Session;
+        public Dictionary<string, PgColumn> Columns = new Dictionary<string, PgColumn>();
 
-        private List<Dictionary<string, object>> FromEmployees()
-        {
-            var doc = @"{""LastName"":""Buchanan"",""FirstName"":""Steven"",""Title"":""Sales Manager""}";
-            return new List<Dictionary<string, object>>
-            {
-                new()
-                {
-                    ["id()"] = "employees/1-A",
-                    ["json"] = doc
-                }
-            };
-        }
 
         public async Task Init(MessageBuilder builder, PipeWriter writer, CancellationToken token)
         {
-            var pgColumns = RunQuery();
-            await writer.WriteAsync(builder.RowDescription(pgColumns), token);
+            await RunQuery();
+            var schema = GenerateSchema();
+            await writer.WriteAsync(builder.RowDescription(schema), token);
         }
 
         public async Task Execute(MessageBuilder builder, PipeWriter writer, CancellationToken token)
@@ -88,62 +81,59 @@ namespace PgRvn.Server
             await writer.WriteAsync(builder.CommandComplete($"SELECT {_results.Count}"), token);
         }
 
-        public List<PgColumn> RunQuery()
+        public async Task RunQuery()
         {
-            switch (QueryText)
-            {
-                case "from Employees":
-                    _results = FromEmployees();
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(QueryText);
-            }
+            var query = Session.Advanced.AsyncRawQuery<BlittableJsonReaderObject>(QueryText);
 
-            if (_results.Count == 0)
+            if (Parameters != null)
             {
-                // TODO: maybe need to default here or something
-                return new List<PgColumn>(); // not sure if okay!
-            }
-
-            var cols = new List<PgColumn>();
-
-            foreach (var (key,val) in _results[0])
-            {
-                cols.Add(new PgColumn
+                foreach (var (key, value) in Parameters)
                 {
-                    Name = key,
-                    FormatCode = val switch
-                    {
-                        double or float or int or long or short or byte => PgFormat.Binary,
-                        string => PgFormat.Text,
-                        _ => throw new ArgumentOutOfRangeException()
-                    },
-                    TypeModifier = -1,
-                    TypeObjectId = val switch
-                    {
-                        int => PgTypeOIDs.Int4,
-                        long => PgTypeOIDs.Int8,
-                        float => PgTypeOIDs.Float4,
-                        double => PgTypeOIDs.Float8,
-                        short => PgTypeOIDs.Int2,
-                        string => PgTypeOIDs.Text,
-                        _ => throw new ArgumentOutOfRangeException()
-                    },
-                    DataTypeSize = val switch
-                    {
-                        int => sizeof(int),
-                        long => sizeof(long),
-                        float => sizeof(float),
-                        double => sizeof(double),
-                        short => sizeof(short),
-                        string => -1,
-                        _ => throw new ArgumentOutOfRangeException()
-                    },
-                    ColumnIndex = (short)cols.Count,
-                });
+                    query.AddParameter(key, value);
+                }
             }
 
-            return cols;
+            _results = await query.ToListAsync();
+        }
+
+        private ICollection<PgColumn> GenerateSchema()
+        {
+            if (_results.Count == 0) 
+                return Array.Empty<PgColumn>();
+
+            var sample = _results[0];
+
+
+            BlittableJsonReaderObject.PropertyDetails prop = default;
+            for (int i = 0; i < sample.Count; i++)
+            {
+                sample.GetPropertyByIndex(i, ref prop, false);
+                var (type, size, format) = (prop.Token & BlittableJsonReaderBase.TypesMask) switch
+                {
+                    BlittableJsonToken.Boolean => (PgTypeOIDs.Bool, sizeof(bool), PgFormat.Binary),
+                    BlittableJsonToken.CompressedString => (PgTypeOIDs.Text, -1, PgFormat.Text),
+                    BlittableJsonToken.EmbeddedBlittable => (PgTypeOIDs.Json, -1, PgFormat.Text),
+                    BlittableJsonToken.Integer => (PgTypeOIDs.Int8, sizeof(long), PgFormat.Binary),
+                    BlittableJsonToken.LazyNumber => (PgTypeOIDs.Float8, sizeof(double), PgFormat.Binary),
+                    BlittableJsonToken.Null => (PgTypeOIDs.Json, -1, PgFormat.Text),
+                    BlittableJsonToken.String => (PgTypeOIDs.Text, -1, PgFormat.Text),
+                    BlittableJsonToken.StartArray => (PgTypeOIDs.Json,-1, PgFormat.Text),
+                    BlittableJsonToken.StartObject => (PgTypeOIDs.Json,-1, PgFormat.Text),
+                    _ => throw new NotSupportedException()
+                };
+                Columns[prop.Name] = new PgColumn
+                {
+                    Name = prop.Name,
+                    FormatCode = format,
+                    TypeModifier = -1,
+                    TypeObjectId = type,
+                    DataTypeSize = (short)size,
+                    ColumnIndex = (short)i,
+                    TableObjectId = 0
+                };
+            }
+
+            return Columns.Values;
         }
     }
 }

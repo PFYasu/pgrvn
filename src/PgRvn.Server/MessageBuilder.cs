@@ -209,7 +209,7 @@ namespace PgRvn.Server
             return pos;
         }
 
-        public ReadOnlyMemory<byte> RowDescription(IReadOnlyCollection<PgColumn> columns)
+        public ReadOnlyMemory<byte> RowDescription(ICollection<PgColumn> columns)
         {
             // TODO: Make sure parametersDataTypeObjectIds length can be cast to short
             int pos = 0;

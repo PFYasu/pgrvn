@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Raven.Client.Documents;
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -24,13 +25,15 @@ namespace PgRvn.Server
         private readonly int _identifier;
         private Dictionary<string, string> _clientOptions;
         private readonly int _processId;
+        private readonly DocumentStore _docStore;
 
-        public Session(TcpClient client, CancellationToken token, int identifier, int processId)
+        public Session(TcpClient client, CancellationToken token, int identifier, int processId, Raven.Client.Documents.DocumentStore docStore)
         {
             _client = client;
             _token = token;
             _identifier = identifier;
             _processId = processId;
+            this._docStore = docStore;
         }
 
         public enum ProtocolVersion
@@ -84,28 +87,15 @@ namespace PgRvn.Server
                     Parse parse => transaction.Parse(parse, messageBuilder),
                     Bind bind => transaction.Bind(bind, messageBuilder),
                     Sync => transaction.Sync(messageBuilder),
-                    _ => ReadOnlyMemory<byte>.Empty
+                    Describe => await transaction.Describe(messageBuilder, writer, _token),
+                    Execute => await transaction.Execute(messageBuilder, writer, _token),
+                    _ => throw new NotSupportedException()
                 };
 
                 if (!response.IsEmpty)
                 {
                     await writer.WriteAsync(response, _token);
                     continue;
-                }
-
-                if (message is Describe)
-                {
-                    // TODO: Handle case where transaction state is Idle
-                    // TODO: Handle PgObjectType of Portal vs. PreparedStatement differently along with handling the ObjectName
-                    await transaction.CurrentQuery.Init(messageBuilder, writer, _token);
-                }
-                else if (message is Execute)
-                {
-                    await transaction.CurrentQuery.Execute(messageBuilder, writer, _token);
-                }
-                else
-                {
-                    throw new NotSupportedException("Message not supported");
                 }
             }
         }

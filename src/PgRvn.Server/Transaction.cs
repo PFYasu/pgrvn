@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Raven.Client.Documents;
+using System;
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Linq;
@@ -36,13 +37,16 @@ namespace PgRvn.Server
             }
         }
 
+        public IDocumentStore DocumentStore { get; }
+
         private int _rowsOperated = 0;
 
         public Query CurrentQuery;
 
-        public Transaction()
+        public Transaction(IDocumentStore documentStore)
         {
             State = TransactionState.Idle;
+            DocumentStore = documentStore;
         }
         
         public ReadOnlyMemory<byte> Parse(Parse message, MessageBuilder messageBuilder)
@@ -65,9 +69,11 @@ namespace PgRvn.Server
             //    could match a function with two IN and two OUT arguments, if $3 and $4 are specified as having type void.
 
             // TODO: Pass message.Parameters
+            CurrentQuery?.Session?.Dispose();
             CurrentQuery = new Query
             {
                 QueryText = message.Query,
+                Session = DocumentStore.OpenSession()
             };
 
             // TODO: Verify data and return ErrorMessage if needed (and change transaction state)
@@ -89,7 +95,17 @@ namespace PgRvn.Server
             return messageBuilder.BindComplete();
         }
 
+        public async Task<ReadOnlyMemory<byte>> Describe(MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
+        {
+            await CurrentQuery.Init(messageBuilder, writer, token);
+            return default;
+        }
 
+        public async Task<ReadOnlyMemory<byte>> Execute(MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
+        {
+            await CurrentQuery.Execute(messageBuilder, writer, token);
+            return default;
+        }
 
         // public ReadOnlyMemory<byte> CommandComplete(MessageBuilder messageBuilder)
         // {
