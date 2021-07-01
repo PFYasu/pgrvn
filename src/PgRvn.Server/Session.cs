@@ -75,49 +75,37 @@ namespace PgRvn.Server
             {
                 var message = await ReadMessage(reader);
 
-                // TODO: Optimization: Send multiple messages in one packet (ParseComplete + BindComplete + ..)
+                // TODO: Should maybe move this to inside each transaction.Function ?
+                if (transaction.State == TransactionState.Failed && message is not Sync)
+                    continue;
 
-                // If transaction failed, skip any messages until Sync is reached
-                if (transaction.State == TransactionState.Failed && message.Type != MessageType.Sync)
+                var response = message switch
                 {
+                    Parse parse => transaction.Parse(parse, messageBuilder),
+                    Bind bind => transaction.Bind(bind, messageBuilder),
+                    Sync => transaction.Sync(messageBuilder),
+                    _ => ReadOnlyMemory<byte>.Empty
+                };
+
+                if (!response.IsEmpty)
+                {
+                    await writer.WriteAsync(response, _token);
                     continue;
                 }
 
-                switch (message.Type)
+                if (message is Describe)
                 {
-                    case MessageType.Parse:
-                    {
-                        var response = transaction.Parse((Parse)message, messageBuilder);
-                        await writer.WriteAsync(response, _token);
-                        break;
-                    }
-                    case MessageType.Bind:
-                    {
-                        var response = transaction.Bind((Bind)message, messageBuilder);
-                        await writer.WriteAsync(response, _token);
-                        break;
-                    }
-                    case MessageType.Describe:
-                    {
-                        var response = transaction.Describe((Describe)message, messageBuilder);
-                        await writer.WriteAsync(response, _token);
-                        break;
-                    }
-                    case MessageType.Execute:
-                    {
-                        var response = transaction.Execute((Execute)message, messageBuilder);
-                        await writer.WriteAsync(response, _token);
-                        await writer.WriteAsync(transaction.CommandComplete(messageBuilder), _token);
-                        break;
-                    }
-                    case MessageType.Sync:
-                    {
-                        // TODO: Postgres seems to only send ReadyForQuery after there are no more Parse messages in the queue, unlike this
-                        await writer.WriteAsync(transaction.Sync(messageBuilder), _token);
-                        break;
-                    }
-                    default:
-                        throw new NotSupportedException("Unsupported message type: " + (char)message.Type);
+                    // TODO: Handle case where transaction state is Idle
+                    // TODO: Handle PgObjectType of Portal vs. PreparedStatement differently along with handling the ObjectName
+                    await transaction.CurrentQuery.Init(messageBuilder, writer, _token);
+                }
+                else if (message is Execute)
+                {
+                    await transaction.CurrentQuery.Execute(messageBuilder, writer, _token);
+                }
+                else
+                {
+                    throw new NotSupportedException("Message not supported");
                 }
             }
         }
@@ -282,7 +270,7 @@ namespace PgRvn.Server
                 }
 
                 default:
-                    throw new NotSupportedException("Message type unsupported: " + (char) msgType);
+                    throw new NotSupportedException("Message type unsupported: " + (char)msgType);
             }
         }
 

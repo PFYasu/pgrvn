@@ -80,6 +80,7 @@ namespace PgRvn.Server
 
     public class PgColumnData
     {
+        public static readonly PgColumnData Null = new PgColumnData {IsNull = true, Data = ReadOnlyMemory<byte>.Empty};
         public bool IsNull = false;
         public ReadOnlyMemory<byte> Data;
     }
@@ -107,12 +108,10 @@ namespace PgRvn.Server
 
     public abstract class Message
     {
-        public abstract MessageType Type { get; }
     }
 
     public class Parse : Message
     {
-        public override MessageType Type => MessageType.Parse;
         public string StatementName;
         public string Query;
 
@@ -128,7 +127,6 @@ namespace PgRvn.Server
 
     public class Bind : Message
     {
-        public override MessageType Type => MessageType.Bind;
         public string PortalName;
         public string StatementName;
         public short[] ParameterFormatCodes;
@@ -138,7 +136,6 @@ namespace PgRvn.Server
 
     public class Describe : Message
     {
-        public override MessageType Type => MessageType.Describe;
 
         /// <summary>
         /// Type of Postgres object to describe (Portal/Statement)
@@ -149,13 +146,11 @@ namespace PgRvn.Server
 
     public class Execute : Message
     {
-        public override MessageType Type => MessageType.Execute;
         public string PortalName;
         public int MaxRows;
     }
 
     public class Sync : Message
     {
-        public override MessageType Type => MessageType.Sync;
     }
 }

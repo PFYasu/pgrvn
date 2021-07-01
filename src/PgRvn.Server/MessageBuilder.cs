@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace PgRvn.Server
 {
-    class MessageBuilder : IDisposable
+    public class MessageBuilder : IDisposable
     {
         private readonly IMemoryOwner<byte> _bufferOwner;
         private Memory<byte> Buffer => _bufferOwner.Memory;
@@ -180,7 +180,7 @@ namespace PgRvn.Server
             return Buffer[..pos];
         }
 
-        public ReadOnlyMemory<byte> DataRows(IReadOnlyCollection<PgColumnData> columns)
+        public ReadOnlyMemory<byte> DataRow(IReadOnlyCollection<PgColumnData> columns)
         {
             var pos = DataRow(columns, Buffer.Span);
             return Buffer[..pos];
