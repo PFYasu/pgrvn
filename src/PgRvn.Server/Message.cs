@@ -109,13 +109,13 @@ namespace PgRvn.Server
         public string Query;
 
         /// <summary>
-        /// The number of parameter data types specified (can be zero).
+        /// Object ID number of parameter data types specified (can be zero).
         /// </summary>
         /// <remarks>
         /// Note that this is not an indication of the number of parameters that might appear
         /// in the query string, only the number that the frontend wants to prespecify types for.
         /// </remarks>
-        public int[] ParametersDataTypeOid;
+        public int[] ParametersDataTypes;
     }
 
     public class Bind : Message

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using TSQL.Statements;
@@ -21,31 +22,15 @@ namespace PgRvn.Server
 
     class Transaction
     {
-        private TransactionState _state = TransactionState.Idle;
-        private int _rowsOperated;
-        public TransactionState State
-        {
-            get => _state;
-            private set
-            {
-                _state = value;
-
-                // TODO: Make less ugly with an actual reset function
-                if (value == TransactionState.Idle)
-                {
-                    _rowsOperated = 0;
-                }
-            }
-        }
+        public TransactionState State { get; private set; } = TransactionState.Idle;
 
         public IDocumentStore DocumentStore { get; }
 
-
         public Query CurrentQuery;
+
 
         public Transaction(IDocumentStore documentStore)
         {
-            State = TransactionState.Idle;
             DocumentStore = documentStore;
         }
         
@@ -74,8 +59,9 @@ namespace PgRvn.Server
             CurrentQuery?.Session?.Dispose();
             CurrentQuery = new Query
             {
-                QueryText = message.Query,
-                Session = DocumentStore.OpenAsyncSession()
+                QueryText = message.Query.Replace("$", "$p"), // TODO: Remove this once RavenDB-16956 is merged
+                Session = DocumentStore.OpenAsyncSession(),
+                ParametersDataTypes = message.ParametersDataTypes
             };
 
             // TODO: Verify data and return ErrorMessage if needed (and change transaction state)
@@ -92,11 +78,22 @@ namespace PgRvn.Server
             // TODO: Handle parameters
             CurrentQuery.Parameters ??= new Dictionary<string, object>();
 
+            int i = 0;
             foreach (var parameter in message.Parameters)
             {
-                //CurrentQuery.Parameters.Add(parameter);
+                object processedParameter = CurrentQuery.ParametersDataTypes[i] switch
+                {
+                    PgTypeOIDs.Bool => Query.TrueBuffer.SequenceEqual(parameter),
+                    PgTypeOIDs.Text => Encoding.UTF8.GetString(parameter),
+                    PgTypeOIDs.Json => Encoding.UTF8.GetString(parameter),
+                    PgTypeOIDs.Int8 => IPAddress.NetworkToHostOrder(BitConverter.ToInt64(parameter)),
+                    PgTypeOIDs.Float8 => BitConverter.ToDouble(parameter.Reverse().ToArray()),
+                    _ => parameter
+                };
+
+                CurrentQuery.Parameters.Add($"p{i+1}", processedParameter); // TODO: cast parameter to the correct type
+                i++;
             }
-            //CurrentQuery.Parameters.Add();
 
             // TODO: Verify data, bind parameters using _parseMessage and return ErrorMessage if needed
 

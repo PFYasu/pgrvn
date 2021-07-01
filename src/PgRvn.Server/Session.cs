@@ -147,7 +147,7 @@ namespace PgRvn.Server
                     {
                         StatementName = statementName,
                         Query = query,
-                        ParametersDataTypeOid = parameters
+                        ParametersDataTypes = parameters
                     };
                 }
 

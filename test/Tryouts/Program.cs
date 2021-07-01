@@ -55,7 +55,6 @@ namespace Tryouts
             }
 
             var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=BookStore;ServerCompatibilityMode=NoTypeLoading;Timeout=600";
-            //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore";
 
             using var conn = new NpgsqlConnection(connString);
             conn.Open();
@@ -70,7 +69,7 @@ namespace Tryouts
             //Select(conn, "from Employees as e select { FullName: e.FirstName + ' ' + e.LastName } "); // projection via js
             Select(conn, "from Employees where Address.City = @city", new Dictionary<string, object>
             {
-                ["city"] = "London"
+                ["city"] = "Seattle"
             }); // with args
             //Select(conn, "from Orders include Employee"); // with include
 

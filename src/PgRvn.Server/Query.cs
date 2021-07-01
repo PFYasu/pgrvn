@@ -22,6 +22,7 @@ namespace PgRvn.Server
         public IAsyncDocumentSession Session;
         public Dictionary<string, PgColumn> Columns = new Dictionary<string, PgColumn>();
         private bool _hasId;
+        public int[] ParametersDataTypes;
 
         public async Task Init(MessageBuilder builder, PipeWriter writer, CancellationToken token)
         {
@@ -30,7 +31,7 @@ namespace PgRvn.Server
             await writer.WriteAsync(builder.RowDescription(schema), token);
         }
 
-        private static byte[] TrueBuffer = new byte[] { 1 }, FalseBuffer = new byte[] { 0 };
+        public static byte[] TrueBuffer = new byte[] { 1 }, FalseBuffer = new byte[] { 0 };
         public async Task Execute(MessageBuilder builder, PipeWriter writer, CancellationToken token)
         {
             BlittableJsonReaderObject.PropertyDetails prop = default;
