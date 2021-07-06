@@ -21,7 +21,7 @@ namespace PgRvn.Server
         public Dictionary<string, object> Parameters;
         private QueryResult _result;
         public IAsyncDocumentSession Session;
-        public Dictionary<string, PgColumn> Columns = new Dictionary<string, PgColumn>();
+        public Dictionary<string, PgColumn> Columns = new();
         private bool _hasId;
         public int[] ParametersDataTypes;
 
@@ -220,7 +220,7 @@ namespace PgRvn.Server
                     Name = "is_include()",
                     FormatCode = PgFormat.Binary,
                     TypeModifier = -1,
-                    TypeObjectId = PgTypeOIDs.Bit,
+                    TypeObjectId = PgTypeOIDs.Bool,
                     DataTypeSize = 1,
                     ColumnIndex = (short)Columns.Count,
                     TableObjectId = 0
