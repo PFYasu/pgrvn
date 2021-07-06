@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Raven.Client.Documents.Queries;
 
 namespace PgRvn.Server
 {
@@ -18,7 +19,7 @@ namespace PgRvn.Server
         public string QueryText;
 
         public Dictionary<string, object> Parameters;
-        private List<BlittableJsonReaderObject> _results;
+        private QueryResult _result;
         public IAsyncDocumentSession Session;
         public Dictionary<string, PgColumn> Columns = new Dictionary<string, PgColumn>();
         private bool _hasId;
@@ -32,13 +33,17 @@ namespace PgRvn.Server
         }
 
         public static byte[] TrueBuffer = new byte[] { 1 }, FalseBuffer = new byte[] { 0 };
+        private bool _hasIncludes;
+
         public async Task Execute(MessageBuilder builder, PipeWriter writer, CancellationToken token)
         {
             BlittableJsonReaderObject.PropertyDetails prop = default;
             var row = ArrayPool<ReadOnlyMemory<byte>?>.Shared.Rent(Columns.Count);
             try
             {
-                foreach (var result in _results)
+                var jsonIndex = _hasIncludes ? Columns.Count - 2 : Columns.Count - 1;
+                var includesIndex = Columns.Count - 1;
+                foreach (BlittableJsonReaderObject result in _result.Results)
                 {
                     Array.Clear(row, 0, row.Length);
 
@@ -84,8 +89,25 @@ namespace PgRvn.Server
                     if (result.Modifications.Removals.Count != result.Count)
                     {
                         var modified = Session.Advanced.Context.ReadObject(result, "renew");
-                        row[^1] = Encoding.UTF8.GetBytes(modified.ToString());
+                        row[jsonIndex] = Encoding.UTF8.GetBytes(modified.ToString());
                     }
+
+                    if (_hasIncludes)
+                    {
+                        row[includesIndex] = FalseBuffer;
+                    }
+                    await writer.WriteAsync(builder.DataRow(row[..Columns.Count]), token);
+                }
+
+                for (int i = 0; i < _result.Includes.Count; i++)
+                {
+                    Array.Clear(row, 0, row.Length);
+
+                    _result.Includes.GetPropertyByIndex(i, ref prop);
+
+                    row[0] = Encoding.UTF8.GetBytes(prop.Name);
+                    row[jsonIndex] = Encoding.UTF8.GetBytes(prop.Value.ToString());
+                    row[includesIndex] = TrueBuffer;
                     await writer.WriteAsync(builder.DataRow(row[..Columns.Count]), token);
                 }
             }
@@ -94,7 +116,7 @@ namespace PgRvn.Server
                 ArrayPool<ReadOnlyMemory<byte>?>.Shared.Return(row);
             }
 
-            await writer.WriteAsync(builder.CommandComplete($"SELECT {_results.Count}"), token);
+            await writer.WriteAsync(builder.CommandComplete($"SELECT {_result.Results.Length + _result.Includes.Count}"), token);
         }
 
         public async Task RunQuery()
@@ -109,17 +131,18 @@ namespace PgRvn.Server
                 }
             }
 
-            _results = await query.ToListAsync();
+            _result = await ((AsyncDocumentQuery<BlittableJsonReaderObject>) query).GetQueryResultAsync();
         }
 
         private ICollection<PgColumn> GenerateSchema()
         {
-            if (_results.Count == 0)
+            if (_result.Results.Length == 0)
                 return Array.Empty<PgColumn>();
 
-            var sample = _results[0];
+            var sample = (BlittableJsonReaderObject)_result.Results[0];
             
-            if (sample.TryGet("@metadata", out BlittableJsonReaderObject metadata) && metadata.TryGet("@id", out string _))
+            if (_result.Includes.Count > 0 ||
+                sample.TryGet("@metadata", out BlittableJsonReaderObject metadata) && metadata.TryGet("@id", out string _))
             {
                 _hasId = true;
                 Columns["id()"] = new PgColumn
@@ -188,6 +211,21 @@ namespace PgRvn.Server
                 ColumnIndex = (short)Columns.Count,
                 TableObjectId = 0
             };
+
+            if (_result.Includes.Count != 0)
+            {
+                _hasIncludes = true;
+                Columns["is_include()"] = new PgColumn
+                {
+                    Name = "is_include()",
+                    FormatCode = PgFormat.Binary,
+                    TypeModifier = -1,
+                    TypeObjectId = PgTypeOIDs.Bit,
+                    DataTypeSize = 1,
+                    ColumnIndex = (short)Columns.Count,
+                    TableObjectId = 0
+                };
+            }
 
             return Columns.Values;
         }

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Odbc;
+using System.Threading;
 using Npgsql;
 using NpgsqlTypes;
 using PgRvn.Server;
@@ -67,6 +69,23 @@ namespace Tryouts
             dt2.Print();
         }
 
+        static void InitODBC()
+        {
+            var connectionString = "Driver={PostgreSQL Unicode};Server=127.0.0.1;Port=5433;Database=BookStore;Uid=postgres;Pwd=123456;";
+            var cnDb = new OdbcConnection(connectionString);
+            cnDb.Open();
+
+            // Create a dataset
+            var dsDB = new DataSet();
+            var adDB = new OdbcDataAdapter();
+            var cbDB = new OdbcCommandBuilder(adDB);
+            adDB.SelectCommand = new OdbcCommand("select 1; select 2", cnDb);
+            adDB.Fill(dsDB);
+
+            // Display the record count
+            Console.WriteLine($"Table contains {dsDB.Tables[0].Rows.Count} rows.\n");
+        }
+
         static void Main(string[] args)
         {
             try
@@ -82,17 +101,22 @@ namespace Tryouts
                 return;
             }
 
-            var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;ServerCompatibilityMode=NoTypeLoading;Timeout=600";
+            var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=BookStore;ServerCompatibilityMode=NoTypeLoading;Timeout=600";
+
+            //InitODBC();
+
 
             using var conn = new NpgsqlConnection(connString);
             conn.Open();
 
-            //SelectMulti(conn, "select 1; select 2");
-            SelectMulti(conn, "select @test1; select @test2", new Dictionary<string, object>
-            {
-                ["test1"] = 1,
-                ["test2"] = 2
-            });
+
+            // Thread.Sleep(1000 * 60 * 10);
+            //SelectMulti(conn, "from Employees select FirstName");
+            // SelectMulti(conn, "select @test1; select @test2", new Dictionary<string, object>
+            // {
+            //     ["test1"] = 1,
+            //     ["test2"] = 2
+            // });
             // Select(conn, "from Employees");
             // Select(conn, "from Employees select LastName, FirstName");
             // Select(conn, "from index 'Orders/Totals'"); // map index
@@ -105,7 +129,7 @@ namespace Tryouts
             // {
             //     ["city"] = "Seattle"
             // }); // with args
-            // Select(conn, "from Orders include Employee"); // with include
+            Select(conn, "from Orders include Employee limit 3 "); // with include
 
 
             // out of scope for now: graph queries
