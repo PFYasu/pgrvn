@@ -8,6 +8,29 @@ using System.Threading.Tasks;
 
 namespace PgRvn.Server
 {
+    class PgFatalException : Exception
+    {
+        private string _severity;
+        private string _errorCode;
+        private string _errorMessage;
+        private string _description;
+
+        /// <summary>
+        /// Creates an Postgres exception to be sent back to the client
+        /// </summary>
+        /// <param name="severity">A Postgres severity string. See <see cref="PgSeverity"/></param>
+        /// <param name="errorCode">A Postgres error code (SqlState). See <see cref="PgErrorCodes"/></param>
+        /// <param name="errorMessage">Error message</param>
+        /// <param name="description">Error description</param>
+        /// <returns>ErrorResponse message</returns>
+        public PgFatalException(string severity, string errorCode, string errorMessage, string description = null) : base(errorMessage)
+        {
+            _severity = severity;
+            _errorCode = errorCode;
+            _errorMessage = errorMessage;
+            _description = description;
+        }
+    }
     class Session
     {
         private readonly TcpClient _client;
@@ -36,7 +59,10 @@ namespace PgRvn.Server
             var initialMessage = await messageReader.ReadInitialMessage(reader, _token);
             if (initialMessage is SSLRequest)
             {
-                await HandleTlsConnection();
+                if (!await TryHandleTlsConnection())
+                {
+                    return;
+                }
                 initialMessage = await messageReader.ReadInitialMessage(reader, _token);
             }
 
@@ -67,13 +93,26 @@ namespace PgRvn.Server
                     return;
             }
 
-            var docStore = new DocumentStore
+            DocumentStore docStore;
+            try
             {
-                Urls = new[] { "http://localhost:8080" },
-                Database = clientOptions["database"]
-            };
-            docStore.Initialize();
-
+                docStore = new DocumentStore
+                {
+                    Urls = new[] { "http://localhost:8080" },
+                    Database = clientOptions["database"]
+                };
+                docStore.Initialize();
+            }
+            catch (Exception e)
+            {
+                await writer.WriteAsync(messageBuilder.ErrorResponse(
+                    PgSeverity.Fatal,
+                    PgErrorCodes.ConnectionFailure,
+                    "Failed to connect to database",
+                    e.Message), _token);
+                return;
+            }
+            
             var transaction = new Transaction(docStore);
 
             await writer.WriteAsync(messageBuilder.AuthenticationOk(), _token);
@@ -88,7 +127,6 @@ namespace PgRvn.Server
                 if (message is Terminate)
                     break;
 
-                // TODO: Should maybe move this to inside each transaction.Function ?
                 if (transaction.State == TransactionState.Failed && message is not Sync)
                     continue;
 
@@ -102,19 +140,14 @@ namespace PgRvn.Server
                     _ => throw new NotSupportedException()
                 };
 
-                if (!response.IsEmpty)
-                {
-                    await writer.WriteAsync(response, _token);
-                    continue;
-                }
+                await writer.WriteAsync(response, _token);
             }
         }
 
-        private async Task HandleTlsConnection()
+        private async Task<bool> TryHandleTlsConnection()
         {
-            // TODO: Respond with 'S' if willing to perform SSL or 'N' otherwise
-            throw new NotSupportedException("Will handle later");
-            // establish ssl
+            // TODO: Establish SSL, respond with 'S' if willing to perform SSL or 'N' otherwise, etc.
+            return false;
         }
     }
 }

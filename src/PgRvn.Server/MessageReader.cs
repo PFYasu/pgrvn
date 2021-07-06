@@ -29,11 +29,11 @@ namespace PgRvn.Server
             {
                 (int) ProtocolVersion.CancelMessage => new Cancel(),
                 (int) ProtocolVersion.TlsConnection => new SSLRequest(),
-                _ => await ReadStartupMessage(protocolVersion, msgLen, reader, token)
+                _ => await StartupMessage(protocolVersion, msgLen, reader, token)
             };
         }
 
-        private async Task<StartupMessage> ReadStartupMessage(int version, int msgLen, PipeReader reader, CancellationToken token)
+        private async Task<StartupMessage> StartupMessage(int version, int msgLen, PipeReader reader, CancellationToken token)
         {
             if (version != (int)ProtocolVersion.Version3)
             {
@@ -74,133 +74,16 @@ namespace PgRvn.Server
             switch (msgType)
             {
                 case (byte)MessageType.Parse:
-                    {
-                        var (statementName, statementLength) = await ReadNullTerminatedString(reader, token);
-                        msgLen -= statementLength;
-
-                        var (query, queryLength) = await ReadNullTerminatedString(reader, token);
-                        msgLen -= queryLength;
-
-                        var parametersCount = await ReadInt16Async(reader, token);
-                        msgLen -= sizeof(short);
-
-                        var parameters = new int[parametersCount];
-                        for (int i = 0; i < parametersCount; i++)
-                        {
-                            parameters[i] = await ReadInt32Async(reader, token);
-                            msgLen -= sizeof(int);
-                        }
-
-                        if (msgLen != 0)
-                            throw new InvalidOperationException("Wrong size?");
-
-                        return new Parse
-                        {
-                            StatementName = statementName,
-                            Query = query,
-                            ParametersDataTypes = parameters
-                        };
-                    }
+                    return await Parse(msgLen, reader, token);
 
                 case (byte)MessageType.Bind:
-                    {
-                        var (destPortalName, destPortalLength) = await ReadNullTerminatedString(reader, token);
-                        msgLen -= destPortalLength;
-
-                        var (preparedStatementName, preparedStatementLength) = await ReadNullTerminatedString(reader, token);
-                        msgLen -= preparedStatementLength;
-
-                        var parameterFormatCodeCount = await ReadInt16Async(reader, token);
-                        msgLen -= sizeof(short);
-
-                        var parameterCodes = new short[parameterFormatCodeCount];
-                        for (var i = 0; i < parameterFormatCodeCount; i++)
-                        {
-                            parameterCodes[i] = await ReadInt16Async(reader, token);
-                            msgLen -= sizeof(short);
-                        }
-
-                        var parametersCount = await ReadInt16Async(reader, token);
-                        msgLen -= sizeof(short);
-
-                        var parameters = new List<byte[]>(parametersCount);
-                        for (var i = 0; i < parametersCount; i++)
-                        {
-                            var parameterLength = await ReadInt32Async(reader, token);
-                            msgLen -= sizeof(int);
-
-                            // TODO: Is it okay to allocate up to 2GB of data based on external output?
-                            // TODO: Format as bytes vs. text depending on the format codes given
-                            parameters.Add(await ReadBytesAsync(reader, parameterLength, token));
-                            msgLen -= parameterLength;
-                        }
-
-                        var resultColumnFormatCodesCount = await ReadInt16Async(reader, token);
-                        msgLen -= sizeof(short);
-
-                        var resultColumnFormatCodes = new short[resultColumnFormatCodesCount];
-                        for (var i = 0; i < resultColumnFormatCodesCount; i++)
-                        {
-                            resultColumnFormatCodes[i] = await ReadInt16Async(reader, token);
-                            msgLen -= sizeof(short);
-                        }
-
-                        if (msgLen != 0)
-                            throw new InvalidOperationException("Wrong size?");
-
-                        return new Bind
-                        {
-                            PortalName = destPortalName,
-                            StatementName = preparedStatementName,
-                            ParameterFormatCodes = parameterCodes,
-                            Parameters = parameters,
-                            ResultColumnFormatCodes = resultColumnFormatCodes
-                        };
-                    }
+                    return await Bind(msgLen, reader, token);
 
                 case (byte)MessageType.Describe:
-                    {
-                        var describeObjectType = await ReadByteAsync(reader, token);
-                        msgLen -= sizeof(byte);
-
-                        var pgObjectType = describeObjectType switch
-                        {
-                            (byte)PgObjectType.Portal => PgObjectType.Portal,
-                            (byte)PgObjectType.PreparedStatement => PgObjectType.PreparedStatement,
-                            _ => throw new InvalidOperationException("Expected valid object type ('S' or 'P'), got: '" +
-                                                                     describeObjectType)
-                        };
-
-                        var (describedName, describedNameLength) = await ReadNullTerminatedString(reader, token);
-                        msgLen -= describedNameLength;
-
-                        if (msgLen != 0)
-                            throw new InvalidOperationException("Wrong size?");
-
-                        return new Describe
-                        {
-                            PgObjectType = pgObjectType,
-                            ObjectName = describedName
-                        };
-                    }
+                    return await Describe(msgLen, reader, token);
 
                 case (byte)MessageType.Execute:
-                    {
-                        var (portalName, portalNameLength) = await ReadNullTerminatedString(reader, token);
-                        msgLen -= portalNameLength;
-
-                        var maxRowsToReturn = await ReadInt32Async(reader, token);
-                        msgLen -= sizeof(int);
-
-                        if (msgLen != 0)
-                            throw new InvalidOperationException("Wrong size?");
-
-                        return new Execute
-                        {
-                            PortalName = portalName,
-                            MaxRows = maxRowsToReturn
-                        };
-                    }
+                    return await Execute(msgLen, reader, token);
 
                 case (byte)MessageType.Sync:
                     {
@@ -221,6 +104,135 @@ namespace PgRvn.Server
                 default:
                     throw new NotSupportedException("Message type unsupported: " + (char)msgType);
             }
+        }
+
+        private async Task<Parse> Parse(int msgLen, PipeReader reader, CancellationToken token)
+        {
+            var (statementName, statementLength) = await ReadNullTerminatedString(reader, token);
+            msgLen -= statementLength;
+
+            var (query, queryLength) = await ReadNullTerminatedString(reader, token);
+            msgLen -= queryLength;
+
+            var parametersCount = await ReadInt16Async(reader, token);
+            msgLen -= sizeof(short);
+
+            var parameters = new int[parametersCount];
+            for (int i = 0; i < parametersCount; i++)
+            {
+                parameters[i] = await ReadInt32Async(reader, token);
+                msgLen -= sizeof(int);
+            }
+
+            if (msgLen != 0)
+                throw new InvalidOperationException("Wrong size?");
+
+            return new Parse
+            {
+                StatementName = statementName,
+                Query = query,
+                ParametersDataTypes = parameters
+            };
+        }
+
+        private async Task<Bind> Bind(int msgLen, PipeReader reader, CancellationToken token)
+        {
+            var (destPortalName, destPortalLength) = await ReadNullTerminatedString(reader, token);
+            msgLen -= destPortalLength;
+
+            var (preparedStatementName, preparedStatementLength) = await ReadNullTerminatedString(reader, token);
+            msgLen -= preparedStatementLength;
+
+            var parameterFormatCodeCount = await ReadInt16Async(reader, token);
+            msgLen -= sizeof(short);
+
+            var parameterCodes = new short[parameterFormatCodeCount];
+            for (var i = 0; i < parameterFormatCodeCount; i++)
+            {
+                parameterCodes[i] = await ReadInt16Async(reader, token);
+                msgLen -= sizeof(short);
+            }
+
+            var parametersCount = await ReadInt16Async(reader, token);
+            msgLen -= sizeof(short);
+
+            var parameters = new List<byte[]>(parametersCount);
+            for (var i = 0; i < parametersCount; i++)
+            {
+                var parameterLength = await ReadInt32Async(reader, token);
+                msgLen -= sizeof(int);
+
+                // TODO: Is it okay to allocate up to 2GB of data based on external output?
+                // TODO: Format as bytes vs. text depending on the format codes given
+                parameters.Add(await ReadBytesAsync(reader, parameterLength, token));
+                msgLen -= parameterLength;
+            }
+
+            var resultColumnFormatCodesCount = await ReadInt16Async(reader, token);
+            msgLen -= sizeof(short);
+
+            var resultColumnFormatCodes = new short[resultColumnFormatCodesCount];
+            for (var i = 0; i < resultColumnFormatCodesCount; i++)
+            {
+                resultColumnFormatCodes[i] = await ReadInt16Async(reader, token);
+                msgLen -= sizeof(short);
+            }
+
+            if (msgLen != 0)
+                throw new InvalidOperationException("Wrong size?");
+
+            return new Bind
+            {
+                PortalName = destPortalName,
+                StatementName = preparedStatementName,
+                ParameterFormatCodes = parameterCodes,
+                Parameters = parameters,
+                ResultColumnFormatCodes = resultColumnFormatCodes
+            };
+        }
+
+        private async Task<Describe> Describe(int msgLen, PipeReader reader, CancellationToken token)
+        {
+            var describeObjectType = await ReadByteAsync(reader, token);
+            msgLen -= sizeof(byte);
+
+            var pgObjectType = describeObjectType switch
+            {
+                (byte)PgObjectType.Portal => PgObjectType.Portal,
+                (byte)PgObjectType.PreparedStatement => PgObjectType.PreparedStatement,
+                _ => throw new InvalidOperationException("Expected valid object type ('S' or 'P'), got: '" +
+                                                         describeObjectType)
+            };
+
+            var(describedName, describedNameLength) = await ReadNullTerminatedString(reader, token);
+            msgLen -= describedNameLength;
+
+            if (msgLen != 0)
+                throw new InvalidOperationException("Wrong size?");
+
+            return new Describe
+            {
+                PgObjectType = pgObjectType,
+                ObjectName = describedName
+            };
+        }
+
+        private async Task<Execute> Execute(int msgLen, PipeReader reader, CancellationToken token)
+        {
+            var (portalName, portalNameLength) = await ReadNullTerminatedString(reader, token);
+            msgLen -= portalNameLength;
+
+            var maxRowsToReturn = await ReadInt32Async(reader, token);
+            msgLen -= sizeof(int);
+
+            if (msgLen != 0)
+                throw new InvalidOperationException("Wrong size?");
+
+            return new Execute
+            {
+                PortalName = portalName,
+                MaxRows = maxRowsToReturn
+            };
         }
 
         private async Task<(string String, int LengthInBytes)> ReadNullTerminatedString(PipeReader reader, CancellationToken token)
