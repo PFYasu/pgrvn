@@ -14,6 +14,7 @@ namespace PgRvn.Server
         Describe = (byte)'D',
         Execute = (byte)'E',
         Sync = (byte)'S',
+        Terminate = (byte)'X',
 
         // Sent
         ParameterStatus = (byte)'S',
@@ -144,6 +145,10 @@ namespace PgRvn.Server
     }
 
     public class Sync : Message
+    {
+    }
+
+    public class Terminate : Message
     {
     }
 }

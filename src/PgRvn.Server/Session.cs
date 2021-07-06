@@ -78,6 +78,9 @@ namespace PgRvn.Server
             {
                 var message = await ReadMessage(reader);
 
+                if (message is Terminate)
+                    break;
+
                 // TODO: Should maybe move this to inside each transaction.Function ?
                 if (transaction.State == TransactionState.Failed && message is not Sync)
                     continue;
@@ -257,6 +260,14 @@ namespace PgRvn.Server
                         throw new InvalidOperationException("Wrong size?");
 
                     return new Sync();
+                }
+
+                case (byte) MessageType.Terminate:
+                {
+                    if (msgLen != 0)
+                        throw new InvalidOperationException("Wrong size?");
+
+                    return new Terminate();
                 }
 
                 default:
