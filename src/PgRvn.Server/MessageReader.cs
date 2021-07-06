@@ -37,7 +37,7 @@ namespace PgRvn.Server
         {
             if (version != (int)ProtocolVersion.Version3)
             {
-                throw new InvalidOperationException("Unsupported protocol version: " + version);
+                throw new PgFatalException(PgErrorCodes.ProtocolViolation, "Unsupported protocol version: " + version);
             }
 
             msgLen -= sizeof(int);
@@ -54,10 +54,10 @@ namespace PgRvn.Server
             }
 
             if (clientOptions.TryGetValue("client_encoding", out var encoding) && encoding != "UTF8")
-                throw new InvalidOperationException("Only UTF8 encoding is supported, but got: " + encoding);
+                throw new PgFatalException(PgErrorCodes.FeatureNotSupported,"Only UTF8 encoding is supported, but got: " + encoding);
 
-            if (clientOptions.TryGetValue("database", out var db) == false)
-                throw new InvalidOperationException("The database wasn't specified, but is mandatory");
+            if (clientOptions.TryGetValue("database", out _) == false)
+                throw new PgFatalException(PgErrorCodes.ConnectionException, "The database wasn't specified, but is mandatory");
 
             return new StartupMessage
             {
@@ -71,42 +71,48 @@ namespace PgRvn.Server
             var msgType = await ReadByteAsync(reader, token);
             var msgLen = await ReadInt32Async(reader, token) - sizeof(int);
 
+            Message message;
             switch (msgType)
             {
                 case (byte)MessageType.Parse:
-                    return await Parse(msgLen, reader, token);
+                    (message, msgLen) = await ReadParse(msgLen, reader, token);
+                    break;
 
                 case (byte)MessageType.Bind:
-                    return await Bind(msgLen, reader, token);
+                    (message, msgLen) = await ReadBind(msgLen, reader, token);
+                    break;
 
                 case (byte)MessageType.Describe:
-                    return await Describe(msgLen, reader, token);
+                    (message, msgLen) = await ReadDescribe(msgLen, reader, token);
+                    break;
 
                 case (byte)MessageType.Execute:
-                    return await Execute(msgLen, reader, token);
+                    (message, msgLen) = await ReadExecute(msgLen, reader, token);
+                    break;
 
                 case (byte)MessageType.Sync:
-                    {
-                        if (msgLen != 0)
-                            throw new InvalidOperationException("Wrong size?");
-
-                        return new Sync();
-                    }
+                    message = new Sync();
+                    break;
 
                 case (byte)MessageType.Terminate:
-                    {
-                        if (msgLen != 0)
-                            throw new InvalidOperationException("Wrong size?");
-
-                        return new Terminate();
-                    }
+                    message = new Terminate();
+                    break;
 
                 default:
-                    throw new NotSupportedException("Message type unsupported: " + (char)msgType);
+                    // TODO: Catch cases of messages that are real but *unsupported* and skip them if we can instead of fatally exiting
+                    throw new PgFatalException(PgErrorCodes.ProtocolViolation, "Message type unrecognized: " + (char)msgType);
             }
+
+            if (msgLen != 0)
+            {
+                throw new PgFatalException(PgErrorCodes.ProtocolViolation,
+                    $"Message is larger than specified in msgLen field, {msgLen} extra bytes in message.");
+            }
+
+            return message;
         }
 
-        private async Task<Parse> Parse(int msgLen, PipeReader reader, CancellationToken token)
+        private async Task<(Parse, int)> ReadParse(int msgLen, PipeReader reader, CancellationToken token)
         {
             var (statementName, statementLength) = await ReadNullTerminatedString(reader, token);
             msgLen -= statementLength;
@@ -124,18 +130,15 @@ namespace PgRvn.Server
                 msgLen -= sizeof(int);
             }
 
-            if (msgLen != 0)
-                throw new InvalidOperationException("Wrong size?");
-
-            return new Parse
+            return (new Parse
             {
                 StatementName = statementName,
                 Query = query,
                 ParametersDataTypes = parameters
-            };
+            }, msgLen);
         }
 
-        private async Task<Bind> Bind(int msgLen, PipeReader reader, CancellationToken token)
+        private async Task<(Bind, int)> ReadBind(int msgLen, PipeReader reader, CancellationToken token)
         {
             var (destPortalName, destPortalLength) = await ReadNullTerminatedString(reader, token);
             msgLen -= destPortalLength;
@@ -178,20 +181,17 @@ namespace PgRvn.Server
                 msgLen -= sizeof(short);
             }
 
-            if (msgLen != 0)
-                throw new InvalidOperationException("Wrong size?");
-
-            return new Bind
+            return (new Bind
             {
                 PortalName = destPortalName,
                 StatementName = preparedStatementName,
                 ParameterFormatCodes = parameterCodes,
                 Parameters = parameters,
                 ResultColumnFormatCodes = resultColumnFormatCodes
-            };
+            }, msgLen);
         }
 
-        private async Task<Describe> Describe(int msgLen, PipeReader reader, CancellationToken token)
+        private async Task<(Describe, int)> ReadDescribe(int msgLen, PipeReader reader, CancellationToken token)
         {
             var describeObjectType = await ReadByteAsync(reader, token);
             msgLen -= sizeof(byte);
@@ -200,24 +200,21 @@ namespace PgRvn.Server
             {
                 (byte)PgObjectType.Portal => PgObjectType.Portal,
                 (byte)PgObjectType.PreparedStatement => PgObjectType.PreparedStatement,
-                _ => throw new InvalidOperationException("Expected valid object type ('S' or 'P'), got: '" +
-                                                         describeObjectType)
+                _ => throw new PgFatalException(PgErrorCodes.ProtocolViolation,
+                    "Expected valid object type ('S' or 'P'), got: '" + describeObjectType)
             };
 
             var(describedName, describedNameLength) = await ReadNullTerminatedString(reader, token);
             msgLen -= describedNameLength;
 
-            if (msgLen != 0)
-                throw new InvalidOperationException("Wrong size?");
-
-            return new Describe
+            return (new Describe
             {
                 PgObjectType = pgObjectType,
                 ObjectName = describedName
-            };
+            }, msgLen);
         }
 
-        private async Task<Execute> Execute(int msgLen, PipeReader reader, CancellationToken token)
+        private async Task<(Execute, int)> ReadExecute(int msgLen, PipeReader reader, CancellationToken token)
         {
             var (portalName, portalNameLength) = await ReadNullTerminatedString(reader, token);
             msgLen -= portalNameLength;
@@ -225,14 +222,11 @@ namespace PgRvn.Server
             var maxRowsToReturn = await ReadInt32Async(reader, token);
             msgLen -= sizeof(int);
 
-            if (msgLen != 0)
-                throw new InvalidOperationException("Wrong size?");
-
-            return new Execute
+            return (new Execute
             {
                 PortalName = portalName,
                 MaxRows = maxRowsToReturn
-            };
+            }, msgLen);
         }
 
         private async Task<(string String, int LengthInBytes)> ReadNullTerminatedString(PipeReader reader, CancellationToken token)

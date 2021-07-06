@@ -10,25 +10,20 @@ namespace PgRvn.Server
 {
     class PgFatalException : Exception
     {
-        private string _severity;
-        private string _errorCode;
-        private string _errorMessage;
-        private string _description;
+        public string ErrorCode;
+        public string Description;
 
         /// <summary>
         /// Creates an Postgres exception to be sent back to the client
         /// </summary>
-        /// <param name="severity">A Postgres severity string. See <see cref="PgSeverity"/></param>
         /// <param name="errorCode">A Postgres error code (SqlState). See <see cref="PgErrorCodes"/></param>
         /// <param name="errorMessage">Error message</param>
         /// <param name="description">Error description</param>
         /// <returns>ErrorResponse message</returns>
-        public PgFatalException(string severity, string errorCode, string errorMessage, string description = null) : base(errorMessage)
+        public PgFatalException(string errorCode, string errorMessage, string description = null) : base(errorMessage)
         {
-            _severity = severity;
-            _errorCode = errorCode;
-            _errorMessage = errorMessage;
-            _description = description;
+            ErrorCode = errorCode;
+            Description = description;
         }
     }
     class Session
@@ -120,27 +115,39 @@ namespace PgRvn.Server
             await writer.WriteAsync(messageBuilder.BackendKeyData(_processId, _identifier), _token);
             await writer.WriteAsync(messageBuilder.ReadyForQuery(transaction.State), _token);
 
-            while (_token.IsCancellationRequested == false)
+            try
             {
-                var message = await messageReader.ReadMessage(reader, _token);
-
-                if (message is Terminate)
-                    break;
-
-                if (transaction.State == TransactionState.Failed && message is not Sync)
-                    continue;
-
-                var response = message switch
+                while (_token.IsCancellationRequested == false)
                 {
-                    Parse parse => transaction.Parse(parse, messageBuilder),
-                    Bind bind => transaction.Bind(bind, messageBuilder),
-                    Sync => transaction.Sync(messageBuilder),
-                    Describe => await transaction.Describe(messageBuilder, writer, _token),
-                    Execute => await transaction.Execute(messageBuilder, writer, _token),
-                    _ => throw new NotSupportedException()
-                };
+                    var message = await messageReader.ReadMessage(reader, _token);
 
-                await writer.WriteAsync(response, _token);
+                    if (message is Terminate)
+                        break;
+
+                    if (transaction.State == TransactionState.Failed && message is not Sync)
+                        continue;
+
+                    var response = message switch
+                    {
+                        Parse parse => transaction.Parse(parse, messageBuilder),
+                        Bind bind => transaction.Bind(bind, messageBuilder),
+                        Sync => transaction.Sync(messageBuilder),
+                        Describe => await transaction.Describe(messageBuilder, writer, _token),
+                        Execute => await transaction.Execute(messageBuilder, writer, _token),
+                        _ => throw new PgFatalException(PgErrorCodes.ProtocolViolation, "Unrecognized message type")
+                    };
+
+                    await writer.WriteAsync(response, _token);
+                }
+            }
+            catch (PgFatalException e)
+            {
+                await writer.WriteAsync(messageBuilder.ErrorResponse(
+                    PgSeverity.Fatal,
+                    e.ErrorCode,
+                    e.Message,
+                    e.Description), _token);
+                return;
             }
         }
 
