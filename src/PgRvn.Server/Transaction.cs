@@ -77,6 +77,8 @@ namespace PgRvn.Server
 
             CurrentQuery.Parameters ??= new Dictionary<string, object>();
 
+            // TODO: Handle the rest of the Bind's data (parameter type info, output type info)
+
             int i = 0;
             foreach (var parameter in message.Parameters)
             {
