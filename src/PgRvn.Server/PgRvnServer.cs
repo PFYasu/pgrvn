@@ -25,17 +25,10 @@ namespace PgRvn.Server
         private TcpListener _tcpListener;
         private int _sessionIdentifier;
         private readonly int _processId;
-        private DocumentStore _docStore;
 
         public PgRvnServer()
         {
             _processId = Process.GetCurrentProcess().Id;
-            _docStore = new DocumentStore
-            {
-                Urls = new[] {"http://localhost:8080"},
-                Database = "Northwind"
-            };
-            _docStore.Initialize();
         }
 
         public void Initialize()
@@ -77,7 +70,7 @@ namespace PgRvn.Server
 
         public async Task HandleConnection(TcpClient client)
         {
-            var session = new Session(client, _cts.Token, Interlocked.Increment(ref _sessionIdentifier), _processId, _docStore);
+            var session = new Session(client, _cts.Token, Interlocked.Increment(ref _sessionIdentifier), _processId);
             await session.Run();
         }
     }

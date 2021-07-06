@@ -151,4 +151,18 @@ namespace PgRvn.Server
     public class Terminate : Message
     {
     }
+
+    public class StartupMessage : Message
+    {
+        public ProtocolVersion ProtocolVersion;
+        public Dictionary<string, string> ClientOptions;
+    }
+
+    public class Cancel : Message
+    {
+    }
+
+    public class SSLRequest : Message
+    {
+    }
 }
