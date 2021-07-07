@@ -161,7 +161,7 @@ namespace PgRvn.Server
                     await writer.WriteAsync(messageBuilder.ErrorResponse(
                         PgSeverity.Fatal,
                         PgErrorCodes.InternalError,
-                        e.Message), _token);
+                        e.ToString()), _token);
                 }
                 catch (Exception)
                 {

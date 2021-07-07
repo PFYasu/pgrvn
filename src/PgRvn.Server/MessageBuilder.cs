@@ -93,21 +93,13 @@ namespace PgRvn.Server
             WriteByte((byte)PgErrorField.Message, Buffer.Span, ref pos);
             WriteNullTerminatedString(errorMessage, Buffer.Span, ref pos);
 
-            WriteByte((byte)PgErrorField.FileName, Buffer.Span, ref pos);
-            WriteNullTerminatedString("d:\\pginstaller_13.auto\\postgres.windows-x64\\src\\backend\\utils\\init\\postinit.c", Buffer.Span, ref pos);
-
-            WriteByte((byte)PgErrorField.Line, Buffer.Span, ref pos);
-            WriteNullTerminatedString("877", Buffer.Span, ref pos);
-
-            WriteByte((byte)PgErrorField.Routine, Buffer.Span, ref pos);
-            WriteNullTerminatedString("InitPostgress", Buffer.Span, ref pos);
-
-
             if (description != null)
             {
                 WriteByte((byte)PgErrorField.Description, Buffer.Span, ref pos);
                 WriteNullTerminatedString(description, Buffer.Span, ref pos);
             }
+
+            WriteByte(0, Buffer.Span, ref pos);
 
             // TODO: Support writing more fields, see: https://www.postgresql.org/docs/current/protocol-error-fields.html
 

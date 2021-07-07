@@ -58,7 +58,7 @@ namespace PgRvn.Server
             {
                 var jsonIndex = _hasIncludes ? Columns.Count - 2 : Columns.Count - 1;
                 var includesIndex = Columns.Count - 1;
-
+                
                 foreach (BlittableJsonReaderObject result in _result.Results)
                 {
                     Array.Clear(row, 0, row.Length);
