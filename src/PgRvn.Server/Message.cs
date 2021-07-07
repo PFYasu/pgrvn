@@ -15,6 +15,9 @@ namespace PgRvn.Server
         Execute = (byte)'E',
         Sync = (byte)'S',
         Terminate = (byte)'X',
+        Query = (byte)'Q',
+        Close = (byte)'C',
+        Flush = (byte)'H',
 
         // Sent
         ParameterStatus = (byte)'S',
@@ -25,10 +28,13 @@ namespace PgRvn.Server
 
         ParseComplete = (byte)'1',
         BindComplete = (byte)'2',
+        CloseComplete = (byte)'3',
         ParameterDescription = (byte)'t',
         RowDescription = (byte)'T',
+        NoData = (byte)'n',
         DataRow = (byte)'D',
         CommandComplete = (byte)'C',
+        EmptyQueryResponse = (byte)'I',
     }
 
     public enum PgObjectType : byte
@@ -57,7 +63,7 @@ namespace PgRvn.Server
         ColumnName = (byte)'c',
         DataTypeName = (byte)'d',
         ConstraintName = (byte)'n',
-        FileName = (byte)'f',
+        FileName = (byte)'F',
         Line = (byte)'L',
         Routine = (byte)'R'
     }
@@ -163,6 +169,21 @@ namespace PgRvn.Server
     }
 
     public class SSLRequest : Message
+    {
+    }
+
+    public class Query : Message
+    {
+        public string QueryString;
+    }
+
+    public class Close : Message
+    {
+        public PgObjectType PgObjectType;
+        public string ObjectName;
+    }
+
+    public class Flush : Message
     {
     }
 }

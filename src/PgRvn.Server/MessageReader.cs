@@ -98,6 +98,15 @@ namespace PgRvn.Server
                     message = new Terminate();
                     break;
 
+                case (byte)MessageType.Query:
+                    (message, msgLen) = await ReadQuery(msgLen, reader, token);
+                    break;
+                case (byte)MessageType.Close:
+                    (message, msgLen) = await ReadClose(msgLen, reader, token);
+                    break;
+                case (byte)MessageType.Flush:
+                    message = new Flush();
+                    break;
                 default:
                     // TODO: Catch cases of messages that are real but *unsupported* and skip them if we can instead of fatally exiting
                     throw new PgFatalException(PgErrorCodes.ProtocolViolation, "Message type unrecognized: " + (char)msgType);
@@ -214,6 +223,29 @@ namespace PgRvn.Server
             }, msgLen);
         }
 
+        private async Task<(Close, int)> ReadClose(int msgLen, PipeReader reader, CancellationToken token)
+        {
+            var objectType = await ReadByteAsync(reader, token);
+            msgLen -= sizeof(byte);
+
+            var pgObjectType = objectType switch
+            {
+                (byte)PgObjectType.Portal => PgObjectType.Portal,
+                (byte)PgObjectType.PreparedStatement => PgObjectType.PreparedStatement,
+                _ => throw new PgFatalException(PgErrorCodes.ProtocolViolation,
+                    "Expected valid object type ('S' or 'P') but got: '" + objectType)
+            };
+
+            var (objectName, objectNameLength) = await ReadNullTerminatedString(reader, token);
+            msgLen -= objectNameLength;
+
+            return (new Close
+            {
+                PgObjectType = pgObjectType,
+                ObjectName = objectName
+            }, msgLen);
+        }
+
         private async Task<(Execute, int)> ReadExecute(int msgLen, PipeReader reader, CancellationToken token)
         {
             var (portalName, portalNameLength) = await ReadNullTerminatedString(reader, token);
@@ -226,6 +258,17 @@ namespace PgRvn.Server
             {
                 PortalName = portalName,
                 MaxRows = maxRowsToReturn
+            }, msgLen);
+        }
+
+        private async Task<(Query, int)> ReadQuery(int msgLen, PipeReader reader, CancellationToken token)
+        {
+            var (queryString, queryStringLength) = await ReadNullTerminatedString(reader, token);
+            msgLen -= queryStringLength;
+
+            return (new Query
+            {
+                QueryString = queryString
             }, msgLen);
         }
 

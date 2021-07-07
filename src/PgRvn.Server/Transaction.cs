@@ -4,12 +4,9 @@ using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Linq;
 using System.Net;
-using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using TSQL.Statements;
 
 namespace PgRvn.Server
 {
@@ -26,7 +23,7 @@ namespace PgRvn.Server
 
         public IDocumentStore DocumentStore { get; }
 
-        public Query CurrentQuery;
+        public PgQuery CurrentQuery;
 
 
         public Transaction(IDocumentStore documentStore)
@@ -36,7 +33,6 @@ namespace PgRvn.Server
         
         public ReadOnlyMemory<byte> Parse(Parse message, MessageBuilder messageBuilder)
         {
-            // TODO: Support named statements, see: https://www.postgresql.org/docs/13/protocol-flow.html#PROTOCOL-FLOW-EXT-QUERY
             if (!string.IsNullOrEmpty(message.StatementName))
             {
                 State = TransactionState.Failed;
@@ -45,26 +41,13 @@ namespace PgRvn.Server
                     "Named statements are not supported.");
             }
 
-            // 1. A parameter data type can be left unspecified by setting it to zero, or by making the array of parameter type OIDs
-            //    shorter than the number of parameter symbols ($n) used in the query string.
-            // 2. Another special case is that a parameter's type can be specified as the OID of void.
-            //    This is meant to allow parameter symbols to be used for function parameters that are actually OUT parameters.
-            //    Ordinarily there is no context in which a void parameter could be used, but if such a parameter symbol appears
-            //    in a function's parameter list, it is effectively ignored. For example, a function call such as foo($1,$2,$3,$4)
-            //    could match a function with two IN and two OUT arguments, if $3 and $4 are specified as having type void.
-
-            // TODO: We currently ignore parameter data types if they are sent. This is probably fine.
-
-            // TODO: Pass message.Parameters
             CurrentQuery?.Session?.Dispose();
-            CurrentQuery = new Query
+            CurrentQuery = new PgQuery
             {
                 QueryText = message.Query.Replace("$", "$p"), // TODO: Remove this once RavenDB-16956 is merged
                 Session = DocumentStore.OpenAsyncSession(),
                 ParametersDataTypes = message.ParametersDataTypes
             };
-
-            // TODO: Verify data and return ErrorMessage if needed (and change transaction state)
 
             State = TransactionState.InTransaction;
             return messageBuilder.ParseComplete();
@@ -75,9 +58,39 @@ namespace PgRvn.Server
             if (IsTransactionInactive(messageBuilder, out var errorResponse))
                 return errorResponse;
 
+            // TODO: Support named statements/portals
+            if (!string.IsNullOrEmpty(message.StatementName) || !string.IsNullOrEmpty(message.PortalName))
+            {
+                State = TransactionState.Failed;
+                return messageBuilder.ErrorResponse(PgSeverity.Error,
+                    PgErrorCodes.FeatureNotSupported,
+                    "Named statements/portals are not supported.");
+            }
+
+            short? defaultDataFormat = null;
+            switch (message.ParameterFormatCodes.Length)
+            {
+                case 0:
+                    defaultDataFormat = (short)PgFormat.Text;
+                    break;
+                case 1:
+                    defaultDataFormat = message.ParameterFormatCodes[0];
+                    break;
+                default:
+                    if (message.ParameterFormatCodes.Length != message.Parameters.Count)
+                    {
+                        State = TransactionState.Failed;
+                        return messageBuilder.ErrorResponse(PgSeverity.Error,
+                            PgErrorCodes.ProtocolViolation,
+                            $"Parameter format code amount is {message.ParameterFormatCodes.Length} when expected " +
+                            $"to be 0, 1 or equal to the parameters count {message.Parameters.Count}.");
+                    }
+                    break;
+            }
+
             CurrentQuery.Parameters ??= new Dictionary<string, object>();
 
-            // TODO: Handle the rest of the Bind's data (parameter type info, output type info)
+            // Note: We ignore message.ResultColumnFormatCodes
 
             int i = 0;
             foreach (var parameter in message.Parameters)
@@ -88,13 +101,18 @@ namespace PgRvn.Server
                     dataType = CurrentQuery.ParametersDataTypes[i];
                 }
 
-                object processedParameter = dataType switch
+                short dataFormat = defaultDataFormat ?? message.ParameterFormatCodes[i];
+                object processedParameter = (dataType, dataFormat) switch
                 {
-                    PgTypeOIDs.Bool => Query.TrueBuffer.SequenceEqual(parameter),
-                    PgTypeOIDs.Text => Encoding.UTF8.GetString(parameter),
-                    PgTypeOIDs.Json => Encoding.UTF8.GetString(parameter),
-                    PgTypeOIDs.Int8 => IPAddress.NetworkToHostOrder(BitConverter.ToInt64(parameter)),
-                    PgTypeOIDs.Float8 => BitConverter.ToDouble(parameter.Reverse().ToArray()),
+                    (PgTypeOIDs.Bool, (short)PgFormat.Binary) => PgQuery.TrueBuffer.SequenceEqual(parameter),
+                    (PgTypeOIDs.Text, (short)PgFormat.Text) => Encoding.UTF8.GetString(parameter),
+                    (PgTypeOIDs.Json, (short)PgFormat.Text) => Encoding.UTF8.GetString(parameter),
+                    (PgTypeOIDs.Int2, (short) PgFormat.Binary) => IPAddress.NetworkToHostOrder(BitConverter.ToInt16(parameter)),
+                    (PgTypeOIDs.Int4, (short) PgFormat.Binary) => IPAddress.NetworkToHostOrder(BitConverter.ToInt32(parameter)),
+                    (PgTypeOIDs.Int8, (short) PgFormat.Binary) => IPAddress.NetworkToHostOrder(BitConverter.ToInt64(parameter)),
+                    (PgTypeOIDs.Float4, (short)PgFormat.Binary) => BitConverter.ToSingle(parameter.Reverse().ToArray()),
+                    (PgTypeOIDs.Float8, (short)PgFormat.Binary) => BitConverter.ToDouble(parameter.Reverse().ToArray()),
+                    // (PgTypeOIDs.Char, (short)PgFormat.Binary) => BitConverter.ToChar(parameter.Reverse().ToArray()), // TODO: Test char support
                     _ => parameter
                 };
 
@@ -107,15 +125,63 @@ namespace PgRvn.Server
             return messageBuilder.BindComplete();
         }
 
-        public async Task<ReadOnlyMemory<byte>> Describe(MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
+        public async Task<ReadOnlyMemory<byte>> Describe(Describe message, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
-            await CurrentQuery.Init(messageBuilder, writer, token);
-            return default;
+            if (IsTransactionInactive(messageBuilder, out var errorResponse))
+                return errorResponse;
+
+            if (!string.IsNullOrEmpty(message.ObjectName))
+            {
+                State = TransactionState.Failed;
+                return messageBuilder.ErrorResponse(PgSeverity.Error,
+                    PgErrorCodes.FeatureNotSupported,
+                    "Describe: Named statements/portals are not supported.");
+            }
+
+            var schema = await CurrentQuery.Init();
+
+            if (message.PgObjectType == PgObjectType.PreparedStatement)
+            {
+                await writer.WriteAsync(messageBuilder.ParameterDescription(CurrentQuery.ParametersDataTypes), token);
+            }
+
+            return schema.Count == 0 ? messageBuilder.NoData() : messageBuilder.RowDescription(schema);
         }
 
         public async Task<ReadOnlyMemory<byte>> Execute(MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
             await CurrentQuery.Execute(messageBuilder, writer, token);
+
+            CurrentQuery = null;
+            State = TransactionState.Idle;
+
+            return default;
+        }
+
+        public async Task<ReadOnlyMemory<byte>> Query(Query query, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
+        {
+            // TODO: Handle query
+            // await writer.WriteAsync(messageBuilder.CommandComplete("SET 1"), token);
+            await writer.WriteAsync(messageBuilder.EmptyQueryResponse(), token);
+            await writer.WriteAsync(messageBuilder.ReadyForQuery(State), token);
+            return default;
+        }
+
+        public ReadOnlyMemory<byte> Close(Close message, MessageBuilder messageBuilder)
+        {
+            // Note: It's not an error to close a non existing named portal/statement
+            if (string.IsNullOrEmpty(message.ObjectName))
+            {
+                CurrentQuery = null;
+                State = TransactionState.Idle;
+            }
+            
+            return messageBuilder.CloseComplete();
+        }
+
+        public async Task<ReadOnlyMemory<byte>> Flush(PipeWriter writer, CancellationToken token)
+        {
+            await writer.FlushAsync(token);
             return default;
         }
 
@@ -180,12 +246,12 @@ namespace PgRvn.Server
                 case TransactionState.Idle:
                     errorResponse = messageBuilder.ErrorResponse(PgSeverity.Error,
                         PgErrorCodes.NoActiveSqlTransaction,
-                        "Bind was called when no transaction is taking place.");
+                        "Message was sent when no transaction is taking place.");
                     return true;
                 case TransactionState.Failed:
                     errorResponse = messageBuilder.ErrorResponse(PgSeverity.Error,
                         PgErrorCodes.InFailedSqlTransaction,
-                        "Bind was called when transaction has failed.");
+                        "Message was sent when transaction has failed.");
                     return true;
                 default:
                     errorResponse = null;

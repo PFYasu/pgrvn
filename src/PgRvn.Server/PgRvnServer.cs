@@ -70,8 +70,16 @@ namespace PgRvn.Server
 
         public async Task HandleConnection(TcpClient client)
         {
-            var session = new Session(client, _cts.Token, Interlocked.Increment(ref _sessionIdentifier), _processId);
-            await session.Run();
+            try
+            {
+                var session = new Session(client, _cts.Token, Interlocked.Increment(ref _sessionIdentifier),
+                    _processId);
+                await session.Run();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
         }
     }
 }

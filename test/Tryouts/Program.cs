@@ -106,10 +106,9 @@ namespace Tryouts
 
             //InitODBC();
 
-
+            // TODO: Figure out why Npgsql doesn't handle our ErrorResponse messages gracefully
             using var conn = new NpgsqlConnection(connString);
             conn.Open();
-
 
             // Thread.Sleep(1000 * 60 * 10);
             //SelectMulti(conn, "from Employees select FirstName");
@@ -130,7 +129,13 @@ namespace Tryouts
             // {
             //     ["city"] = "Seattle"
             // }); // with args
-            Select(conn, "from Orders include Employee limit 3 "); // with include
+            Select(conn, "from Employees where Address.City = @para", new Dictionary<string, object>
+            {
+                ["para"] = 's'
+            }); // with args
+            // Select(conn, "from Orders include Employee limit 3 "); // with include
+            // Select(conn, "thisisbad"); // with include
+            // Select(conn, "from x"); // Empty results
 
 
             // out of scope for now: graph queries

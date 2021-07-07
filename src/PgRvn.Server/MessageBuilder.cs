@@ -36,6 +36,17 @@ namespace PgRvn.Server
             return Buffer[..pos];
         }
 
+        public ReadOnlyMemory<byte> EmptyQueryResponse()
+        {
+            int pos = 0;
+
+            WriteByte((byte)MessageType.EmptyQueryResponse, Buffer.Span, ref pos);
+            WriteInt32(pos + sizeof(int) - sizeof(byte), Buffer.Span, ref pos);
+
+            return Buffer[..pos];
+        }
+        
+
         public ReadOnlyMemory<byte> AuthenticationOk()
         {
             int pos = 0;
@@ -81,6 +92,16 @@ namespace PgRvn.Server
 
             WriteByte((byte)PgErrorField.Message, Buffer.Span, ref pos);
             WriteNullTerminatedString(errorMessage, Buffer.Span, ref pos);
+
+            WriteByte((byte)PgErrorField.FileName, Buffer.Span, ref pos);
+            WriteNullTerminatedString("d:\\pginstaller_13.auto\\postgres.windows-x64\\src\\backend\\utils\\init\\postinit.c", Buffer.Span, ref pos);
+
+            WriteByte((byte)PgErrorField.Line, Buffer.Span, ref pos);
+            WriteNullTerminatedString("877", Buffer.Span, ref pos);
+
+            WriteByte((byte)PgErrorField.Routine, Buffer.Span, ref pos);
+            WriteNullTerminatedString("InitPostgress", Buffer.Span, ref pos);
+
 
             if (description != null)
             {
@@ -163,6 +184,16 @@ namespace PgRvn.Server
             return Buffer[..pos];
         }
 
+        public ReadOnlyMemory<byte> CloseComplete()
+        {
+            int pos = 0;
+
+            WriteByte((byte)MessageType.CloseComplete, Buffer.Span, ref pos);
+            WriteInt32(pos + sizeof(int) - sizeof(byte), Buffer.Span, ref pos);
+
+            return Buffer[..pos];
+        }
+
         public ReadOnlyMemory<byte> CommandComplete(string tag)
         {
             int pos = 0;
@@ -211,7 +242,6 @@ namespace PgRvn.Server
 
         public ReadOnlyMemory<byte> RowDescription(ICollection<PgColumn> columns)
         {
-            // TODO: Make sure parametersDataTypeObjectIds length can be cast to short
             int pos = 0;
             WriteByte((byte)MessageType.RowDescription, Buffer.Span, ref pos);
 
@@ -219,8 +249,12 @@ namespace PgRvn.Server
             int tempPos = pos;
             pos += sizeof(int);
 
-            // TODO: Make sure columns.Count can be cast to short
-            WriteInt16((short)columns.Count, Buffer.Span, ref pos);
+            if (!ConvertToShort(columns.Count, out var columnsCount))
+            {
+                throw new InvalidCastException($"Columns list is too long to be contained in the message ({columnsCount}).");
+            }
+
+            WriteInt16(columnsCount, Buffer.Span, ref pos);
 
             foreach (var field in columns)
             {
@@ -233,30 +267,60 @@ namespace PgRvn.Server
                 WriteInt16((short)field.FormatCode, Buffer.Span, ref pos);
             }
 
+            // Write length
             WriteInt32(pos - sizeof(byte), Buffer.Span, ref tempPos);
+
             return Buffer[..pos];
         }
 
-        private int ParameterDescription(IReadOnlyList<int> parametersDataTypeObjectIds, Span<byte> buffer)
+        public ReadOnlyMemory<byte> NoData()
         {
             int pos = 0;
-            WriteByte((byte)MessageType.ParameterDescription, buffer, ref pos);
+
+            WriteByte((byte)MessageType.NoData, Buffer.Span, ref pos);
+            WriteInt32(pos + sizeof(int) - sizeof(byte), Buffer.Span, ref pos);
+
+            return Buffer[..pos];
+        }
+
+        public ReadOnlyMemory<byte> ParameterDescription(IReadOnlyList<int> parametersDataTypeObjectIds)
+        {
+            int pos = 0;
+            WriteByte((byte)MessageType.ParameterDescription, Buffer.Span, ref pos);
 
             // Skip length
             int tempPos = pos;
             pos += sizeof(int);
 
-            // TODO: Make sure parametersDataTypeObjectIds.Count can be cast to short
-            WriteInt16((short)parametersDataTypeObjectIds.Count, buffer, ref pos);
+            if (!ConvertToShort(parametersDataTypeObjectIds.Count, out var paramCount))
+            {
+                throw new InvalidCastException($"Parameter data type list is too long to be contained " +
+                                               $"in the message ({paramCount}).");
+            }
+
+            WriteInt16(paramCount, Buffer.Span, ref pos);
 
             foreach (var t in parametersDataTypeObjectIds)
             {
-                WriteInt32(t, buffer, ref pos);
+                WriteInt32(t, Buffer.Span, ref pos);
             }
 
-            WriteInt32(pos - 1, buffer, ref tempPos);
+            // Write length
+            WriteInt32(pos - sizeof(byte), Buffer.Span, ref tempPos);
 
-            return pos;
+            return Buffer[..pos];
+        }
+
+        private bool ConvertToShort(int value, out short outVal)
+        {
+            if (value < short.MinValue || value > short.MaxValue)
+            {
+                outVal = 0;
+                return false;
+            }
+
+            outVal = (short)value;
+            return true;
         }
 
         private void WriteBytes(ReadOnlyMemory<byte> value, Span<byte> buffer, ref int pos)

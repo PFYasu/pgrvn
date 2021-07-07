@@ -14,7 +14,7 @@ using Raven.Client.Documents.Queries;
 
 namespace PgRvn.Server
 {
-    public class Query
+    public class PgQuery
     {
         public string QueryText;
 
@@ -25,11 +25,10 @@ namespace PgRvn.Server
         private bool _hasId;
         public int[] ParametersDataTypes;
 
-        public async Task Init(MessageBuilder builder, PipeWriter writer, CancellationToken token)
+        public async Task<ICollection<PgColumn>> Init()
         {
             await RunQuery();
-            var schema = GenerateSchema();
-            await writer.WriteAsync(builder.RowDescription(schema), token);
+            return GenerateSchema();
         }
 
         public static byte[] TrueBuffer = new byte[] { 1 }, FalseBuffer = new byte[] { 0 };
@@ -37,6 +36,11 @@ namespace PgRvn.Server
 
         public async Task Execute(MessageBuilder builder, PipeWriter writer, CancellationToken token)
         {
+            if (_result == null)
+            {
+                await RunQuery();
+            }
+
             BlittableJsonReaderObject.PropertyDetails prop = default;
             var row = ArrayPool<ReadOnlyMemory<byte>?>.Shared.Rent(Columns.Count);
             try

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace PgRvn.Server
 {
-    class PgFatalException : Exception
+    public class PgFatalException : Exception
     {
         public string ErrorCode;
         public string Description;
@@ -26,7 +26,7 @@ namespace PgRvn.Server
             Description = description;
         }
     }
-    class Session
+    public class Session
     {
         private readonly TcpClient _client;
         private readonly CancellationToken _token;
@@ -107,16 +107,19 @@ namespace PgRvn.Server
                     e.Message), _token);
                 return;
             }
-            
-            var transaction = new Transaction(docStore);
 
-            await writer.WriteAsync(messageBuilder.AuthenticationOk(), _token);
-            await writer.WriteAsync(messageBuilder.ParameterStatusMessages(PgConfig.ParameterStatusList), _token);
-            await writer.WriteAsync(messageBuilder.BackendKeyData(_processId, _identifier), _token);
-            await writer.WriteAsync(messageBuilder.ReadyForQuery(transaction.State), _token);
+            // TODO: Send a NoData message from Describe if no rows will be returned
+            // TODO: Send a EmptyQueryResponse message from Execute if no rows were returned
 
             try
             {
+                var transaction = new Transaction(docStore);
+
+                await writer.WriteAsync(messageBuilder.AuthenticationOk(), _token);
+                await writer.WriteAsync(messageBuilder.ParameterStatusMessages(PgConfig.ParameterStatusList), _token);
+                await writer.WriteAsync(messageBuilder.BackendKeyData(_processId, _identifier), _token);
+                await writer.WriteAsync(messageBuilder.ReadyForQuery(transaction.State), _token);
+
                 while (_token.IsCancellationRequested == false)
                 {
                     var message = await messageReader.ReadMessage(reader, _token);
@@ -132,8 +135,11 @@ namespace PgRvn.Server
                         Parse parse => transaction.Parse(parse, messageBuilder),
                         Bind bind => transaction.Bind(bind, messageBuilder),
                         Sync => transaction.Sync(messageBuilder),
-                        Describe => await transaction.Describe(messageBuilder, writer, _token),
+                        Describe describe => await transaction.Describe(describe, messageBuilder, writer, _token),
                         Execute => await transaction.Execute(messageBuilder, writer, _token),
+                        Query query => await transaction.Query(query, messageBuilder, writer, _token),
+                        Close close => transaction.Close(close, messageBuilder),
+                        Flush => await transaction.Flush(writer, _token),
                         _ => throw new PgFatalException(PgErrorCodes.ProtocolViolation, "Unrecognized message type")
                     };
 
@@ -147,7 +153,20 @@ namespace PgRvn.Server
                     e.ErrorCode,
                     e.Message,
                     e.Description), _token);
-                return;
+            }
+            catch (Exception e)
+            {
+                try
+                {
+                    await writer.WriteAsync(messageBuilder.ErrorResponse(
+                        PgSeverity.Fatal,
+                        PgErrorCodes.InternalError,
+                        e.Message), _token);
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
             }
         }
 
