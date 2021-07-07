@@ -154,25 +154,27 @@ namespace PgRvn.Server
 
             // todo: handle EmptyQueryResponse
 
-            CurrentQuery = null;
             State = TransactionState.Idle;
-
             return default;
         }
 
         public async Task<ReadOnlyMemory<byte>> Query(Query message, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
             // TODO: Handle query
-            // await writer.WriteAsync(messageBuilder.CommandComplete("SET 1"), token);
             var query = new PgQuery
             {
                 QueryText = message.QueryString,
                 Session = DocumentStore.OpenAsyncSession(),
             };
 
+            var schema = await query.Init();
+            if (schema.Count != 0)
+            {
+                await writer.WriteAsync(messageBuilder.RowDescription(schema), token);
+            }
+
             await query.Execute(messageBuilder, writer, token);
 
-            // await writer.WriteAsync(messageBuilder.EmptyQueryResponse(), token);
             await writer.WriteAsync(messageBuilder.ReadyForQuery(State), token);
             return default;
         }
@@ -182,7 +184,6 @@ namespace PgRvn.Server
             // Note: It's not an error to close a non existing named portal/statement
             if (string.IsNullOrEmpty(message.ObjectName))
             {
-                CurrentQuery = null;
                 State = TransactionState.Idle;
             }
             

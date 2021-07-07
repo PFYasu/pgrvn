@@ -27,15 +27,26 @@ namespace PgRvn.Server
 
         public async Task<ICollection<PgColumn>> Init()
         {
+            if (string.IsNullOrWhiteSpace(QueryText))
+            {
+                return default;
+            }
+
             await RunQuery();
             return GenerateSchema();
         }
 
-        public static byte[] TrueBuffer = new byte[] { 1 }, FalseBuffer = new byte[] { 0 };
+        public static byte[] TrueBuffer = { 1 }, FalseBuffer = { 0 };
         private bool _hasIncludes;
 
         public async Task Execute(MessageBuilder builder, PipeWriter writer, CancellationToken token)
         {
+            if (string.IsNullOrWhiteSpace(QueryText))
+            {
+                await writer.WriteAsync(builder.EmptyQueryResponse(), token);
+                return;
+            }
+
             if (_result == null)
             {
                 await RunQuery();
@@ -47,13 +58,6 @@ namespace PgRvn.Server
             {
                 var jsonIndex = _hasIncludes ? Columns.Count - 2 : Columns.Count - 1;
                 var includesIndex = Columns.Count - 1;
-
-                // todo: handle no data
-                // if (_result.Results.Length == 0 && _result.Includes.Count == 0)
-                // {
-                //     // await writer.WriteAsync(builder.(), token);
-                //     return;
-                // }
 
                 foreach (BlittableJsonReaderObject result in _result.Results)
                 {
