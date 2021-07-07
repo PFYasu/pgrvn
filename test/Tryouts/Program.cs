@@ -125,16 +125,12 @@ namespace Tryouts
             // Select(conn, "from Orders select Company, OrderedAt, Freight"); // map index projection
             // Select(conn, "from index 'Orders/Totals' select Company, OrderedAt, Freight"); // map index projection
             // Select(conn, "from Employees as e select { FullName: e.FirstName + ' ' + e.LastName } "); // projection via js
-            // Select(conn, "from Employees where Address.City = @city", new Dictionary<string, object>
-            // {
-            //     ["city"] = "Seattle"
-            // }); // with args
-            Select(conn, "from Employees where Address.City = @para", new Dictionary<string, object>
+            Select(conn, "from Employees where Address.City = @city", new Dictionary<string, object>
             {
-                ["para"] = 's'
+                ["city"] = "Seattle"
             }); // with args
             // Select(conn, "from Orders include Employee limit 3 "); // with include
-            // Select(conn, "thisisbad"); // with include
+            // Select(conn, "thisisbad"); // invalid query
             // Select(conn, "from x"); // Empty results
 
 

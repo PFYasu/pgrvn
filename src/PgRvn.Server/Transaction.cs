@@ -152,17 +152,27 @@ namespace PgRvn.Server
         {
             await CurrentQuery.Execute(messageBuilder, writer, token);
 
+            // todo: handle EmptyQueryResponse
+
             CurrentQuery = null;
             State = TransactionState.Idle;
 
             return default;
         }
 
-        public async Task<ReadOnlyMemory<byte>> Query(Query query, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
+        public async Task<ReadOnlyMemory<byte>> Query(Query message, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
             // TODO: Handle query
             // await writer.WriteAsync(messageBuilder.CommandComplete("SET 1"), token);
-            await writer.WriteAsync(messageBuilder.EmptyQueryResponse(), token);
+            var query = new PgQuery
+            {
+                QueryText = message.QueryString,
+                Session = DocumentStore.OpenAsyncSession(),
+            };
+
+            await query.Execute(messageBuilder, writer, token);
+
+            // await writer.WriteAsync(messageBuilder.EmptyQueryResponse(), token);
             await writer.WriteAsync(messageBuilder.ReadyForQuery(State), token);
             return default;
         }
