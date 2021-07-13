@@ -137,6 +137,12 @@ namespace PgRvn.Server
 
         public async Task RunQuery()
         {
+            var sqlQuery = new SqlQuery(QueryText);
+            if (sqlQuery.ParseSingleStatement())
+            {
+                //_results = sqlQuery.Run();
+            }
+
             var query = Session.Advanced.AsyncRawQuery<BlittableJsonReaderObject>(QueryText);
 
             if (Parameters != null)
