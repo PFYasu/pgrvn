@@ -85,6 +85,16 @@ namespace PgRvn.Server
         public PgFormat FormatCode;
     }
 
+    public class PgTable
+    {
+        public List<PgColumn> Columns;
+        public List<PgDataRow> Data;
+    }
+
+    public class PgDataRow
+    {
+        public List<Memory<byte>> ColumnData;
+    }
     public enum PgFormat : short
     {
         Text = 0,

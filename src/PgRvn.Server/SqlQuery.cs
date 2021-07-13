@@ -25,7 +25,6 @@ namespace PgRvn.Server
 
         public bool ParseSingleStatement()
         {
-            // TODO: Abstract the TSQL layer
             var parser = new TSQLParser();
             return parser.ParseSingleStatement(_queryString);
         }
@@ -34,11 +33,6 @@ namespace PgRvn.Server
         {
             throw new NotImplementedException();
         }
-    }
-
-    class SelectStatement
-    {
-        
     }
 
     class TSQLParser
@@ -127,6 +121,8 @@ namespace PgRvn.Server
         //     return Encoding.ASCII.GetBytes("PostgreSQL 13.3, compiled by Visual C++ build 1914, 64-bit");
         // }
 
+        public PgTable Result;
+
         public bool ParseSingleStatement(string queryString)
         {
             var sqlStatements = TSQLStatementReader.ParseStatements(queryString);
@@ -142,22 +138,11 @@ namespace PgRvn.Server
             // because this marks: https://github.com/npgsql/npgsql/blob/792b144e82b39bd09bb081c5617ffec907f07316/src/Npgsql/PostgresDatabaseInfo.cs#L121
             // now return hard coded response
 
-            int i = 0;
-            switch (stmt.Tokens[i].Type)
+            if (stmt.AsSelect != null)
             {
-                case TSQLTokenType.Keyword:
-                    HandleKeyword(stmt, ref i);
-                    break;
-
-                default:
-                    break; // todo: throw
+                int offset = stmt.AsSelect.BeginPosition;
+                HandleSelect(stmt.AsSelect, ref offset);
             }
-
-            // if (stmt.AsSelect != null)
-            // {
-            //     int offset = stmt.AsSelect.BeginPosition;
-            //     HandleSelect(stmt.AsSelect, ref offset);
-            // }
 
             return true;
         }
@@ -197,12 +182,8 @@ namespace PgRvn.Server
             Console.WriteLine("\ttype: identifier, value: " + stmt.Tokens[offset].Text);
         }
 
-        private SelectStatement _selectStatement;
-
         private void HandleSelect(TSQLSelectStatement stmt, ref int offset)
         {
-            _selectStatement = new SelectStatement();
-
             Console.WriteLine("SELECT:");
 
             // Go over select tokens
@@ -228,8 +209,19 @@ namespace PgRvn.Server
             if (stmt.From != null)
             {
                 Console.WriteLine("FROM:");
-                foreach (TSQLToken token in stmt.From.Tokens)
+                for (var i = 0; i < stmt.From.Tokens.Count; i++)
                 {
+                    var token = stmt.From.Tokens[i];
+                    if (token.Type == TSQLTokenType.Keyword &&
+                        token.Text.Equals("JOIN", StringComparison.CurrentCultureIgnoreCase) &&
+                        stmt.From.Tokens[i - 1].Text.Equals("pg_namespace", StringComparison.CurrentCultureIgnoreCase) &&
+                        stmt.From.Tokens[i - 1].Text.Equals("typ_and_elem_type", StringComparison.CurrentCultureIgnoreCase) 
+                        // todo && _queryString.Contains(..)
+                        )
+                    {
+                        Result = PgConfig.NpgsqlInitialQueryResponse;
+                    }
+
                     Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
                 }
             }

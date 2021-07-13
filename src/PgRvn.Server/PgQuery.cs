@@ -20,6 +20,7 @@ namespace PgRvn.Server
 
         public Dictionary<string, object> Parameters;
         private QueryResult _result;
+        private PgTable _sqlResult;
         public IAsyncDocumentSession Session;
         public Dictionary<string, PgColumn> Columns = new();
         private bool _hasId;
@@ -44,6 +45,15 @@ namespace PgRvn.Server
             if (string.IsNullOrWhiteSpace(QueryText))
             {
                 await writer.WriteAsync(builder.EmptyQueryResponse(), token);
+                return;
+            }
+
+            if (_sqlResult != null)
+            {
+                foreach (var dataRow in _sqlResult.Data)
+                {
+                    await writer.WriteAsync(builder.DataRow(dataRow.ColumnData), token);
+                }
                 return;
             }
 
@@ -137,9 +147,11 @@ namespace PgRvn.Server
 
         public async Task RunQuery()
         {
-            var sqlQuery = new SqlQuery(QueryText);
-            if (sqlQuery.ParseSingleStatement())
+            // If SQL query
+            if (!QueryText.StartsWith("from"))
             {
+                var sqlQuery = new SqlQuery(QueryText);
+                sqlQuery.ParseSingleStatement();
                 //_results = sqlQuery.Run();
             }
 
@@ -158,6 +170,11 @@ namespace PgRvn.Server
 
         private ICollection<PgColumn> GenerateSchema()
         {
+            if (_sqlResult != null)
+            {
+                return _sqlResult.Columns;
+            }
+
             if (_result.Results.Length == 0)
                 return Array.Empty<PgColumn>();
 
