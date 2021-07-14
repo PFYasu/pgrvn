@@ -22,6 +22,7 @@ namespace PgRvn.Server
         protected readonly bool IsEmptyQuery;
         protected Dictionary<string, object> Parameters;
         protected readonly Dictionary<string, PgColumn> Columns;
+        protected short[] ResultColumnFormatCodes;
 
         protected PgQuery(string queryString, int[] parametersDataTypes)
         {
@@ -48,8 +49,10 @@ namespace PgRvn.Server
 
         public abstract void Dispose();
 
-        public void Bind(IEnumerable<byte[]> parameters, short[] parameterFormatCodes)
+        public void Bind(IEnumerable<byte[]> parameters, short[] parameterFormatCodes, short[] resultColumnFormatCodes)
         {
+            ResultColumnFormatCodes = resultColumnFormatCodes;
+
             if (ParametersDataTypes == null)
             {
                 // todo throw

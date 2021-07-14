@@ -75,6 +75,15 @@ namespace PgRvn.Server
                 };
             }
 
+            var resultsFormat = ResultColumnFormatCodes.Length switch
+            {
+                0 => PgFormat.Text,
+                1 => ResultColumnFormatCodes[0] == 0 ? PgFormat.Text : PgFormat.Binary,
+                _ => throw new NotSupportedException(
+                    "No support for column format code count that isn't 0 or 1, got: " +
+                    ResultColumnFormatCodes.Length) // TODO: Add support
+            };
+
             BlittableJsonReaderObject.PropertyDetails prop = default;
             for (int i = 0; i < sample.Count; i++)
             {
@@ -82,23 +91,23 @@ namespace PgRvn.Server
                 if (prop.Name == "@metadata")
                     continue;
 
-                var (type, size, format) = (prop.Token & BlittableJsonReaderBase.TypesMask) switch
+                var (type, size) = (prop.Token & BlittableJsonReaderBase.TypesMask) switch
                 {
-                    BlittableJsonToken.Boolean => (PgTypeOIDs.Bool, sizeof(bool), PgFormat.Binary),
-                    BlittableJsonToken.CompressedString => (PgTypeOIDs.Text, -1, PgFormat.Text),
-                    BlittableJsonToken.EmbeddedBlittable => (PgTypeOIDs.Json, -1, PgFormat.Text),
-                    BlittableJsonToken.Integer => (PgTypeOIDs.Int8, sizeof(long), PgFormat.Binary),
-                    BlittableJsonToken.LazyNumber => (PgTypeOIDs.Float8, sizeof(double), PgFormat.Binary),
-                    BlittableJsonToken.Null => (PgTypeOIDs.Json, -1, PgFormat.Text),
-                    BlittableJsonToken.String => (PgTypeOIDs.Text, -1, PgFormat.Text),
-                    BlittableJsonToken.StartArray => (PgTypeOIDs.Json, -1, PgFormat.Text),
-                    BlittableJsonToken.StartObject => (PgTypeOIDs.Json, -1, PgFormat.Text),
+                    BlittableJsonToken.Boolean => (PgTypeOIDs.Bool, PgConfig.TrueBuffer.Length),
+                    BlittableJsonToken.CompressedString => (PgTypeOIDs.Text, -1),
+                    BlittableJsonToken.EmbeddedBlittable => (PgTypeOIDs.Json, -1),
+                    BlittableJsonToken.Integer => (PgTypeOIDs.Int8, sizeof(long)),
+                    BlittableJsonToken.LazyNumber => (PgTypeOIDs.Float8, sizeof(double)),
+                    BlittableJsonToken.Null => (PgTypeOIDs.Json, -1),
+                    BlittableJsonToken.String => (PgTypeOIDs.Text, -1),
+                    BlittableJsonToken.StartArray => (PgTypeOIDs.Json, -1),
+                    BlittableJsonToken.StartObject => (PgTypeOIDs.Json, -1),
                     _ => throw new NotSupportedException()
                 };
                 Columns[prop.Name] = new PgColumn
                 {
                     Name = prop.Name,
-                    FormatCode = format,
+                    FormatCode = resultsFormat,
                     TypeModifier = -1,
                     TypeObjectId = type,
                     DataTypeSize = (short)size,

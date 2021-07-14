@@ -69,7 +69,7 @@ namespace PgRvn.Server
                     $"to be 0, 1 or equal to the parameters count {message.Parameters.Count}.");
             }
 
-            CurrentQuery.Bind(message.Parameters, message.ParameterFormatCodes);
+            CurrentQuery.Bind(message.Parameters, message.ParameterFormatCodes, message.ResultColumnFormatCodes);
 
             // Note: We ignore message.ResultColumnFormatCodes
 
