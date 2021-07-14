@@ -166,7 +166,7 @@ namespace Tryouts
             //     ["test1"] = 1,
             //     ["test2"] = 2
             // });
-            // Select(conn, "from Employees");
+            Select(conn, "from @empty");
             // Select(conn, "from Employees select LastName, FirstName");
             // Select(conn, "from index 'Orders/Totals'"); // map index
             // Select(conn, "from index 'Orders/ByCompany'"); // map/reduce index

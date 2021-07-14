@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Linq;
 using System.Net;
@@ -145,7 +146,7 @@ namespace PgRvn.Server
                 Columns["is_include()"] = new PgColumn
                 {
                     Name = "is_include()",
-                    FormatCode = PgFormat.Binary,
+                    FormatCode = resultsFormat,
                     TypeModifier = -1,
                     TypeObjectId = PgTypeOIDs.Bool,
                     DataTypeSize = 1,
@@ -167,6 +168,7 @@ namespace PgRvn.Server
 
             if (_result == null)
             {
+                // todo throw?
                 await RunRqlQuery();
             }
 
@@ -198,16 +200,17 @@ namespace PgRvn.Server
                         if (index == -1)
                             continue;
                         result.GetPropertyByIndex(index, ref prop);
+
                         var value = (prop.Token & BlittableJsonReaderBase.TypesMask, pgColumn.TypeObjectId) switch
                         {
-                            (BlittableJsonToken.Boolean, PgTypeOIDs.Bool) => (bool)prop.Value ? PgConfig.TrueBuffer : PgConfig.FalseBuffer,
-                            (BlittableJsonToken.CompressedString, PgTypeOIDs.Text) => Encoding.UTF8.GetBytes(prop.Value.ToString()),
-                            (BlittableJsonToken.EmbeddedBlittable, PgTypeOIDs.Json) => Encoding.UTF8.GetBytes(prop.Value.ToString()),
-                            (BlittableJsonToken.Integer, PgTypeOIDs.Int8) => BitConverter.GetBytes(IPAddress.HostToNetworkOrder((long)prop.Value)),
-                            (BlittableJsonToken.LazyNumber, PgTypeOIDs.Float8) => BitConverter.GetBytes((double)(LazyNumberValue)prop.Value).Reverse().ToArray(),
-                            (BlittableJsonToken.String, PgTypeOIDs.Text) => Encoding.UTF8.GetBytes(prop.Value.ToString()),
-                            (BlittableJsonToken.StartArray, PgTypeOIDs.Json) => Encoding.UTF8.GetBytes(prop.Value.ToString()),
-                            (BlittableJsonToken.StartObject, PgTypeOIDs.Json) => Encoding.UTF8.GetBytes(prop.Value.ToString()),
+                            (BlittableJsonToken.Boolean, PgTypeOIDs.Bool) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
+                            (BlittableJsonToken.CompressedString, PgTypeOIDs.Text) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
+                            (BlittableJsonToken.EmbeddedBlittable, PgTypeOIDs.Json) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
+                            (BlittableJsonToken.Integer, PgTypeOIDs.Int8) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
+                            (BlittableJsonToken.LazyNumber, PgTypeOIDs.Float8) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)]((LazyNumberValue)prop.Value),
+                            (BlittableJsonToken.String, PgTypeOIDs.Text) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
+                            (BlittableJsonToken.StartArray, PgTypeOIDs.Json) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
+                            (BlittableJsonToken.StartObject, PgTypeOIDs.Json) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
                             (BlittableJsonToken.Null, PgTypeOIDs.Json) => Array.Empty<byte>(),
                             _ => null
                         };
