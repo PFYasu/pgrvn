@@ -108,25 +108,21 @@ namespace PgRvn.Server
         //     return Encoding.ASCII.GetBytes("PostgreSQL 13.3, compiled by Visual C++ build 1914, 64-bit");
         // }
 
-        public bool ParseSingleStatement()
+        public bool Parse(bool allowMultipleStatements)
         {
             var sqlStatements = TSQLStatementReader.ParseStatements(QueryString);
-            if (sqlStatements.Count != 1)
+            if (allowMultipleStatements == false && sqlStatements.Count != 1)
             {
                 throw new InvalidOperationException("Didn't expect more than one SQL statement in queryString, got: " + sqlStatements.Count);
             }
 
-            var stmt = sqlStatements[0];
-
-            //stmt.AsSelect.From - join between pg_namespace and typ_and_elem_type and 
-            // queryString.Contains("-- We first do this for the type (innerest-most subquery), and then for its element type")
-            // because this marks: https://github.com/npgsql/npgsql/blob/792b144e82b39bd09bb081c5617ffec907f07316/src/Npgsql/PostgresDatabaseInfo.cs#L121
-            // now return hard coded response
-
-            if (stmt.AsSelect != null)
+            foreach (var stmt in sqlStatements)
             {
-                int offset = stmt.AsSelect.BeginPosition;
-                HandleSelect(stmt.AsSelect, ref offset);
+                if (stmt.AsSelect != null)
+                {
+                    int offset = stmt.AsSelect.BeginPosition;
+                    HandleSelect(stmt.AsSelect, ref offset);
+                }
             }
 
             return true;
@@ -144,6 +140,7 @@ namespace PgRvn.Server
         {
             Console.WriteLine("\ttype: function, value: " + stmt.Tokens[offset].Text);
 
+            // todo: handle this better (e.g. check that the query is actually select version() or smth)
             if (stmt.Tokens[offset].Text == "version")
             {
                 if (stmt.Tokens[offset + 1].Text == "(" &&
@@ -156,7 +153,7 @@ namespace PgRvn.Server
                         {
                             new PgColumn
                             {
-                                Name = "?column?",
+                                Name = "version",
                                 ColumnIndex = 0,
                                 TypeObjectId = PgTypeOIDs.Text,
                                 DataTypeSize = -1,
@@ -170,13 +167,43 @@ namespace PgRvn.Server
                             {
                                 ColumnData = new ReadOnlyMemory<byte>?[]
                                 {
-                                    Encoding.ASCII.GetBytes("0.10-alpga2")
+                                    Encoding.ASCII.GetBytes("PostgreSQL 13.3, compiled by Visual C++ build 1914, 64-bit")
                                 }
                             }
                         }
                     };
                 }
             }
+            // else if (stmt.Tokens[offset].Text == "set_config" && 
+            //          stmt.Tokens[offset - 1].Text.Equals("SELECT", StringComparison.CurrentCultureIgnoreCase))
+            // {
+            //     // for pgAdmin, it's not actually required, can remove
+            //     _result = new PgTable
+            //     {
+            //         Columns = new()
+            //         {
+            //             new PgColumn
+            //             {
+            //                 Name = "set_config",
+            //                 ColumnIndex = 0,
+            //                 TypeObjectId = PgTypeOIDs.Text,
+            //                 DataTypeSize = -1,
+            //                 FormatCode = PgFormat.Text
+            //
+            //             }
+            //         },
+            //         Data = new List<PgDataRow>
+            //         {
+            //             new()
+            //             {
+            //                 ColumnData = new ReadOnlyMemory<byte>?[]
+            //                 {
+            //                     Encoding.ASCII.GetBytes("hex")
+            //                 }
+            //             }
+            //         }
+            //     };
+            // }
 
             // todo: throw here
         }
@@ -273,14 +300,14 @@ namespace PgRvn.Server
             }
         }
 
-        public override async Task<ICollection<PgColumn>> Init()
+        public override async Task<ICollection<PgColumn>> Init(bool allowMultipleStatements)
         {
             if (IsEmptyQuery)
             {
                 return default;
             }
 
-            ParseSingleStatement(); // todo: handle error (return value)
+            Parse(allowMultipleStatements); // todo: handle error (return value)
 
             if (_result != null)
             {

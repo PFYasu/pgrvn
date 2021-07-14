@@ -31,6 +31,7 @@ namespace PgRvn.Server
             IsEmptyQuery = string.IsNullOrWhiteSpace(QueryString);
             Parameters = new Dictionary<string, object>();
             Columns = new Dictionary<string, PgColumn>();
+            ResultColumnFormatCodes = Array.Empty<short>();
         }
 
         public static PgQuery CreateInstance(string queryText, int[] parametersDataTypes, IDocumentStore documentStore)
@@ -43,7 +44,7 @@ namespace PgRvn.Server
             return new SqlQuery(queryText, parametersDataTypes);
         }
 
-        public abstract Task<ICollection<PgColumn>> Init();
+        public abstract Task<ICollection<PgColumn>> Init(bool allowMultipleStatements=false);
 
         public abstract Task Execute(MessageBuilder builder, PipeWriter writer, CancellationToken token);
 

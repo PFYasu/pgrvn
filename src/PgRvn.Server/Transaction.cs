@@ -71,8 +71,6 @@ namespace PgRvn.Server
 
             CurrentQuery.Bind(message.Parameters, message.ParameterFormatCodes, message.ResultColumnFormatCodes);
 
-            // Note: We ignore message.ResultColumnFormatCodes
-
             return messageBuilder.BindComplete();
         }
 
@@ -114,7 +112,7 @@ namespace PgRvn.Server
             // TODO: Handle query
             var query = PgQuery.CreateInstance(message.QueryString, null, DocumentStore);
 
-            var schema = await query.Init();
+            var schema = await query.Init(true);
             if (schema.Count != 0)
             {
                 await writer.WriteAsync(messageBuilder.RowDescription(schema), token);

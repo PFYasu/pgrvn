@@ -80,11 +80,12 @@ namespace Tryouts
             var dsDB = new DataSet();
             var adDB = new OdbcDataAdapter();
             var cbDB = new OdbcCommandBuilder(adDB);
-            adDB.SelectCommand = new OdbcCommand("select 1; select 2", cnDb);
+            adDB.SelectCommand = new OdbcCommand("from Employees", cnDb);
             adDB.Fill(dsDB);
 
             // Display the record count
-            Console.WriteLine($"Table contains {dsDB.Tables[0].Rows.Count} rows.\n");
+            dsDB.Tables[0].Print();
+            // Console.WriteLine($"Table contains {dsDB.Tables[0].Rows.Count} rows.\n");
         }
 
         static void Main(string[] args)
@@ -105,11 +106,13 @@ namespace Tryouts
             // var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
             var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
 
-            //InitODBC();
+            // InitODBC();
+
+            Thread.Sleep(1000 * 60 * 5);
 
             // TODO: Figure out why Npgsql doesn't handle our ErrorResponse messages gracefully
-            using var conn = new NpgsqlConnection(connString);
-            conn.Open();
+            // using var conn = new NpgsqlConnection(connString);
+            // conn.Open();
 
 
             // Select(conn, "select * from users"); 
@@ -166,7 +169,7 @@ namespace Tryouts
             //     ["test1"] = 1,
             //     ["test2"] = 2
             // });
-            Select(conn, "from @empty");
+            // Select(conn, "from @empty");
             // Select(conn, "from Employees select LastName, FirstName");
             // Select(conn, "from index 'Orders/Totals'"); // map index
             // Select(conn, "from index 'Orders/ByCompany'"); // map/reduce index

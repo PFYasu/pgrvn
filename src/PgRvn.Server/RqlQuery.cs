@@ -27,8 +27,15 @@ namespace PgRvn.Server
             _session = documentStore.OpenAsyncSession();
         }
 
-        public override async Task<ICollection<PgColumn>> Init()
+        public override async Task<ICollection<PgColumn>> Init(bool allowMultipleStatements = false)
         {
+            if (IsEmptyQuery)
+            {
+                return default;
+            }
+
+            // todo: handle allowMultipleStatements
+
             await RunRqlQuery();
             return GenerateSchema();
         }
@@ -160,7 +167,7 @@ namespace PgRvn.Server
 
         public override async Task Execute(MessageBuilder builder, PipeWriter writer, CancellationToken token)
         {
-            if (string.IsNullOrWhiteSpace(QueryString))
+            if (IsEmptyQuery)
             {
                 await writer.WriteAsync(builder.EmptyQueryResponse(), token);
                 return;
@@ -168,8 +175,7 @@ namespace PgRvn.Server
 
             if (_result == null)
             {
-                // todo throw?
-                await RunRqlQuery();
+                throw new InvalidOperationException("RqlQuery.Execute was called when _results = null");
             }
 
             BlittableJsonReaderObject.PropertyDetails prop = default;
@@ -201,19 +207,26 @@ namespace PgRvn.Server
                             continue;
                         result.GetPropertyByIndex(index, ref prop);
 
-                        var value = (prop.Token & BlittableJsonReaderBase.TypesMask, pgColumn.TypeObjectId) switch
+                        byte[] value = null;
+                        switch (prop.Token & BlittableJsonReaderBase.TypesMask, pgColumn.TypeObjectId)
                         {
-                            (BlittableJsonToken.Boolean, PgTypeOIDs.Bool) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
-                            (BlittableJsonToken.CompressedString, PgTypeOIDs.Text) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
-                            (BlittableJsonToken.EmbeddedBlittable, PgTypeOIDs.Json) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
-                            (BlittableJsonToken.Integer, PgTypeOIDs.Int8) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
-                            (BlittableJsonToken.LazyNumber, PgTypeOIDs.Float8) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)]((LazyNumberValue)prop.Value),
-                            (BlittableJsonToken.String, PgTypeOIDs.Text) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
-                            (BlittableJsonToken.StartArray, PgTypeOIDs.Json) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
-                            (BlittableJsonToken.StartObject, PgTypeOIDs.Json) => PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value),
-                            (BlittableJsonToken.Null, PgTypeOIDs.Json) => Array.Empty<byte>(),
-                            _ => null
-                        };
+                            case (BlittableJsonToken.Boolean, PgTypeOIDs.Bool):
+                            case (BlittableJsonToken.CompressedString, PgTypeOIDs.Text):
+                            case (BlittableJsonToken.EmbeddedBlittable, PgTypeOIDs.Json):
+                            case (BlittableJsonToken.Integer, PgTypeOIDs.Int8):
+                            case (BlittableJsonToken.String, PgTypeOIDs.Text):
+                            case (BlittableJsonToken.StartArray, PgTypeOIDs.Json):
+                            case (BlittableJsonToken.StartObject, PgTypeOIDs.Json):
+                                value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value);
+                                break;
+                            case (BlittableJsonToken.LazyNumber, PgTypeOIDs.Float8):
+                                value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](
+                                    (LazyNumberValue) prop.Value);
+                                break;
+                            case (BlittableJsonToken.Null, PgTypeOIDs.Json):
+                                value = Array.Empty<byte>();
+                                break;
+                        }
 
                         if (value == null)
                         {
