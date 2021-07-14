@@ -20,11 +20,8 @@ namespace PgRvn.Server
     class Transaction
     {
         public TransactionState State { get; private set; } = TransactionState.Idle;
-
         public IDocumentStore DocumentStore { get; }
-
         public PgQuery CurrentQuery;
-
 
         public Transaction(IDocumentStore documentStore)
         {
@@ -41,13 +38,7 @@ namespace PgRvn.Server
                     "Named statements are not supported.");
             }
 
-            CurrentQuery?.Session?.Dispose();
-            CurrentQuery = new PgQuery
-            {
-                QueryText = message.Query.Replace("$", "$p"), // TODO: Remove this once RavenDB-16956 is merged
-                Session = DocumentStore.OpenAsyncSession(),
-                ParametersDataTypes = message.ParametersDataTypes
-            };
+            CurrentQuery = PgQuery.CreateInstance(message.Query.Replace("$", "$p"), message.ParametersDataTypes, DocumentStore);
 
             State = TransactionState.InTransaction;
             return messageBuilder.ParseComplete();
@@ -67,60 +58,20 @@ namespace PgRvn.Server
                     "Named statements/portals are not supported.");
             }
 
-            short? defaultDataFormat = null;
-            switch (message.ParameterFormatCodes.Length)
+            if (message.ParameterFormatCodes.Length != message.Parameters.Count &&
+                message.ParameterFormatCodes.Length != 0 &&
+                message.ParameterFormatCodes.Length != 1)
             {
-                case 0:
-                    defaultDataFormat = (short)PgFormat.Text;
-                    break;
-                case 1:
-                    defaultDataFormat = message.ParameterFormatCodes[0];
-                    break;
-                default:
-                    if (message.ParameterFormatCodes.Length != message.Parameters.Count)
-                    {
-                        State = TransactionState.Failed;
-                        return messageBuilder.ErrorResponse(PgSeverity.Error,
-                            PgErrorCodes.ProtocolViolation,
-                            $"Parameter format code amount is {message.ParameterFormatCodes.Length} when expected " +
-                            $"to be 0, 1 or equal to the parameters count {message.Parameters.Count}.");
-                    }
-                    break;
+                State = TransactionState.Failed;
+                return messageBuilder.ErrorResponse(PgSeverity.Error,
+                    PgErrorCodes.ProtocolViolation,
+                    $"Parameter format code amount is {message.ParameterFormatCodes.Length} when expected " +
+                    $"to be 0, 1 or equal to the parameters count {message.Parameters.Count}.");
             }
 
-            CurrentQuery.Parameters ??= new Dictionary<string, object>();
+            CurrentQuery.Bind(message.Parameters, message.ParameterFormatCodes);
 
             // Note: We ignore message.ResultColumnFormatCodes
-
-            int i = 0;
-            foreach (var parameter in message.Parameters)
-            {
-                int dataType = 0;
-                if (i < CurrentQuery.ParametersDataTypes.Length)
-                {
-                    dataType = CurrentQuery.ParametersDataTypes[i];
-                }
-
-                short dataFormat = defaultDataFormat ?? message.ParameterFormatCodes[i];
-                object processedParameter = (dataType, dataFormat) switch
-                {
-                    (PgTypeOIDs.Bool, (short)PgFormat.Binary) => PgQuery.TrueBuffer.SequenceEqual(parameter),
-                    (PgTypeOIDs.Text, (short)PgFormat.Text) => Encoding.UTF8.GetString(parameter),
-                    (PgTypeOIDs.Json, (short)PgFormat.Text) => Encoding.UTF8.GetString(parameter),
-                    (PgTypeOIDs.Int2, (short) PgFormat.Binary) => IPAddress.NetworkToHostOrder(BitConverter.ToInt16(parameter)),
-                    (PgTypeOIDs.Int4, (short) PgFormat.Binary) => IPAddress.NetworkToHostOrder(BitConverter.ToInt32(parameter)),
-                    (PgTypeOIDs.Int8, (short) PgFormat.Binary) => IPAddress.NetworkToHostOrder(BitConverter.ToInt64(parameter)),
-                    (PgTypeOIDs.Float4, (short)PgFormat.Binary) => BitConverter.ToSingle(parameter.Reverse().ToArray()),
-                    (PgTypeOIDs.Float8, (short)PgFormat.Binary) => BitConverter.ToDouble(parameter.Reverse().ToArray()),
-                    // (PgTypeOIDs.Char, (short)PgFormat.Binary) => BitConverter.ToChar(parameter.Reverse().ToArray()), // TODO: Test char support
-                    _ => parameter
-                };
-
-                CurrentQuery.Parameters.Add($"p{i+1}", processedParameter);
-                i++;
-            }
-
-            // TODO: return ErrorMessage if needed
 
             return messageBuilder.BindComplete();
         }
@@ -161,11 +112,7 @@ namespace PgRvn.Server
         public async Task<ReadOnlyMemory<byte>> Query(Query message, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
             // TODO: Handle query
-            var query = new PgQuery
-            {
-                QueryText = message.QueryString,
-                Session = DocumentStore.OpenAsyncSession(),
-            };
+            var query = PgQuery.CreateInstance(message.QueryString, null, DocumentStore);
 
             var schema = await query.Init();
             if (schema.Count != 0)
@@ -195,54 +142,6 @@ namespace PgRvn.Server
             await writer.FlushAsync(token);
             return default;
         }
-
-        // public ReadOnlyMemory<byte> CommandComplete(MessageBuilder messageBuilder)
-        // {
-        //     if (IsTransactionInactive(messageBuilder, out var errorResponse))
-        //         return errorResponse;
-        //
-        //     string tag = null;
-        //     if (_statement.AsInsert != null)
-        //     {
-        //         // OID is always 0
-        //         tag = "INSERT 0";
-        //     }
-        //     else if (_statement.AsDelete != null)
-        //     {
-        //         tag = "DELETE";
-        //     }
-        //     else if (_statement.AsUpdate != null)
-        //     {
-        //         tag = "UPDATE";
-        //     }
-        //     else if (_statement.AsSelect != null)
-        //     {
-        //         tag = "SELECT";
-        //     }
-        //     else
-        //     {
-        //         State = TransactionState.Failed;
-        //         return messageBuilder.ErrorResponse(PgSeverity.Error,
-        //             PgErrorCodes.FeatureNotSupported,
-        //             "Statement tag could not be determined.",
-        //             "Statement: " + _statement);
-        //     }
-        //     // TODO: Support these tags. See CommandComplete in https://www.postgresql.org/docs/current/protocol-message-formats.html
-        //     //else if (_statement.AsMove != null)
-        //     //{
-        //     //    tag = "MOVE";
-        //     //}
-        //     //else if (_statement.AsFetch != null)
-        //     //{
-        //     //    tag = "FETCH";
-        //     //}
-        //     //else if (_statement.AsCopy != null)
-        //     //{
-        //     //    tag = "COPY";
-        //     //}
-        //
-        //     return messageBuilder.CommandComplete($"{tag} {_rowsOperated}");
-        // }
 
         public ReadOnlyMemory<byte> Sync(MessageBuilder messageBuilder)
         {

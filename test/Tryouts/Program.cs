@@ -103,7 +103,7 @@ namespace Tryouts
             }
 
             //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
-            var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=600;ServerCompatibilityMode=NoTypeLoading"; // ServerCompatibilityMode=NoTypeLoading
+            var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;ServerCompatibilityMode=NoTypeLoading"; // ServerCompatibilityMode=NoTypeLoading
 
             //InitODBC();
 
@@ -112,7 +112,9 @@ namespace Tryouts
             conn.Open();
 
 
-            // Select(conn, "select * from users"); // Empty results
+            // Select(conn, "from Employees"); 
+            // Select(conn, "select * from users"); 
+            Select(conn, "select version()"); 
             Select(conn, @"
  SELECT ns.nspname, typ_and_elem_type.*,
    CASE

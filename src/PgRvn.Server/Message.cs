@@ -74,14 +74,14 @@ namespace PgRvn.Server
         /// <summary>
         /// If the field can be identified as a column of a specific table, the object ID of the table; otherwise zero.
         /// </summary>
-        public int TableObjectId;
+        public int TableObjectId = 0;
         /// <summary>
         /// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero.
         /// </summary>
         public short ColumnIndex;
         public int TypeObjectId;
         public short DataTypeSize;
-        public int TypeModifier;
+        public int TypeModifier = -1;
         public PgFormat FormatCode;
     }
 
@@ -93,7 +93,7 @@ namespace PgRvn.Server
 
     public class PgDataRow
     {
-        public List<Memory<byte>> ColumnData;
+        public Memory<ReadOnlyMemory<byte>?> ColumnData;
     }
     public enum PgFormat : short
     {

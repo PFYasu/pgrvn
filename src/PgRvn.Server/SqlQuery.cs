@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO.Pipelines;
 using System.Linq;
 using System.Reflection.Metadata;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Raven.Client.Documents.Linq.Indexing;
 using Raven.Client.Documents.Queries;
@@ -14,29 +16,14 @@ using TSQL.Tokens;
 
 namespace PgRvn.Server
 {
-    public class SqlQuery
+    public class SqlQuery : PgQuery
     {
-        private readonly string _queryString;
+        private PgTable _result;
 
-        public SqlQuery(string queryString)
+        public SqlQuery(string queryString, int[] parametersDataTypes) : base(queryString, parametersDataTypes)
         {
-            _queryString = queryString;
         }
 
-        public bool ParseSingleStatement()
-        {
-            var parser = new TSQLParser();
-            return parser.ParseSingleStatement(_queryString);
-        }
-
-        public QueryResult Run()
-        {
-            throw new NotImplementedException();
-        }
-    }
-
-    class TSQLParser
-    {
         // private static PgColumnData[] Process(TSQLStatement stmt, ref int offset, out PgColumn[] columns, out int rowsOperated)
         // {
         //     // Process SELECT queryString
@@ -121,11 +108,9 @@ namespace PgRvn.Server
         //     return Encoding.ASCII.GetBytes("PostgreSQL 13.3, compiled by Visual C++ build 1914, 64-bit");
         // }
 
-        public PgTable Result;
-
-        public bool ParseSingleStatement(string queryString)
+        public bool ParseSingleStatement()
         {
-            var sqlStatements = TSQLStatementReader.ParseStatements(queryString);
+            var sqlStatements = TSQLStatementReader.ParseStatements(QueryString);
             if (sqlStatements.Count != 1)
             {
                 throw new InvalidOperationException("Didn't expect more than one SQL statement in queryString, got: " + sqlStatements.Count);
@@ -165,9 +150,35 @@ namespace PgRvn.Server
                     stmt.Tokens[offset + 2].Text == ")")
                 {
                     offset += 2;
-                    //return Encoding.ASCII.GetBytes("0.10-alpga2");
+                    _result = new PgTable
+                    {
+                        Columns = new()
+                        {
+                            new PgColumn
+                            {
+                                Name = "?column?",
+                                ColumnIndex = 0,
+                                TypeObjectId = PgTypeOIDs.Text,
+                                DataTypeSize = -1,
+                                FormatCode = PgFormat.Text
+                    
+                            }
+                        },
+                        Data = new List<PgDataRow>
+                        {
+                            new()
+                            {
+                                ColumnData = new ReadOnlyMemory<byte>?[]
+                                {
+                                    Encoding.ASCII.GetBytes("0.10-alpga2")
+                                }
+                            }
+                        }
+                    };
                 }
             }
+
+            // todo: throw here
         }
 
         private void HandleIdentifier(TSQLStatement stmt, ref int offset)
@@ -187,7 +198,6 @@ namespace PgRvn.Server
             Console.WriteLine("SELECT:");
 
             // Go over select tokens
-            offset++;
             for (; offset < stmt.Select.Tokens.Count ; offset++)
             {
                 var token = stmt.Select.Tokens[offset];
@@ -214,12 +224,12 @@ namespace PgRvn.Server
                     var token = stmt.From.Tokens[i];
                     if (token.Type == TSQLTokenType.Keyword &&
                         token.Text.Equals("JOIN", StringComparison.CurrentCultureIgnoreCase) &&
-                        stmt.From.Tokens[i - 1].Text.Equals("pg_namespace", StringComparison.CurrentCultureIgnoreCase) &&
-                        stmt.From.Tokens[i - 1].Text.Equals("typ_and_elem_type", StringComparison.CurrentCultureIgnoreCase) 
+                        stmt.From.Tokens[i - 1].Text.Equals("typ_and_elem_type", StringComparison.CurrentCultureIgnoreCase) &&
+                        stmt.From.Tokens[i + 1].Text.Equals("pg_namespace", StringComparison.CurrentCultureIgnoreCase)
                         // todo && _queryString.Contains(..)
                         )
                     {
-                        Result = PgConfig.NpgsqlInitialQueryResponse;
+                        _result = PgConfig.NpgsqlInitialQueryResponse;
                     }
 
                     Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
@@ -261,6 +271,40 @@ namespace PgRvn.Server
                     Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
                 }
             }
+        }
+
+        public override async Task<ICollection<PgColumn>> Init()
+        {
+            if (IsEmptyQuery)
+            {
+                return default;
+            }
+
+            ParseSingleStatement(); // todo: handle error (return value)
+
+            if (_result != null)
+            {
+                return _result.Columns;
+            }
+
+            return Array.Empty<PgColumn>();
+        }
+
+        public override async Task Execute(MessageBuilder builder, PipeWriter writer, CancellationToken token)
+        {
+            if (_result?.Data != null)
+            {
+                foreach (var dataRow in _result.Data)
+                {
+                    await writer.WriteAsync(builder.DataRow(dataRow.ColumnData.Span), token);
+                }
+            }
+
+            await writer.WriteAsync(builder.CommandComplete($"SELECT {_result?.Data?.Count ?? 0}"), token);
+        }
+
+        public override void Dispose()
+        {
         }
     }
 }
