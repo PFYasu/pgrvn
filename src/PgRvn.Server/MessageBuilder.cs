@@ -303,6 +303,15 @@ namespace PgRvn.Server
             return Buffer[..pos];
         }
 
+        public ReadOnlyMemory<byte> SSLResponse(bool acceptSSL)
+        {
+            int pos = 0;
+
+            WriteByte(acceptSSL ? (byte)'S' : (byte)'N', Buffer.Span, ref pos);
+
+            return Buffer[..pos];
+        }
+
         private bool ConvertToShort(int value, out short outVal)
         {
             if (value < short.MinValue || value > short.MaxValue)

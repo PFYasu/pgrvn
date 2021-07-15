@@ -21,10 +21,12 @@ namespace PgRvn.Server
         private QueryResult _result;
         private bool _hasId;
         private bool _hasIncludes;
+        private bool _isInitialPowerBIQuery;
 
-        public RqlQuery(string queryString, int[] parametersDataTypes, IDocumentStore documentStore) : base(queryString, parametersDataTypes)
+        public RqlQuery(string queryString, int[] parametersDataTypes, IDocumentStore documentStore, bool isInitialPowerBIQuery) : base(queryString, parametersDataTypes)
         {
             _session = documentStore.OpenAsyncSession();
+            _isInitialPowerBIQuery = isInitialPowerBIQuery; // TODO: If true, limit results to 0 (don't send results, just schema)
         }
 
         public override async Task<ICollection<PgColumn>> Init(bool allowMultipleStatements = false)
@@ -65,6 +67,9 @@ namespace PgRvn.Server
             if (_result.Results.Length == 0)
                 return Array.Empty<PgColumn>();
 
+
+            var resultsFormat = GetDefaultResultsFormat();
+
             var sample = (BlittableJsonReaderObject)_result.Results[0];
 
             if (_result.Includes.Count > 0 ||
@@ -74,7 +79,7 @@ namespace PgRvn.Server
                 Columns["id()"] = new PgColumn
                 {
                     Name = "id()",
-                    FormatCode = PgFormat.Text,
+                    FormatCode = resultsFormat,
                     TypeModifier = -1,
                     TypeObjectId = PgTypeOIDs.Text,
                     DataTypeSize = -1,
@@ -82,15 +87,6 @@ namespace PgRvn.Server
                     TableObjectId = 0
                 };
             }
-
-            var resultsFormat = ResultColumnFormatCodes.Length switch
-            {
-                0 => PgFormat.Text,
-                1 => ResultColumnFormatCodes[0] == 0 ? PgFormat.Text : PgFormat.Binary,
-                _ => throw new NotSupportedException(
-                    "No support for column format code count that isn't 0 or 1, got: " +
-                    ResultColumnFormatCodes.Length) // TODO: Add support
-            };
 
             BlittableJsonReaderObject.PropertyDetails prop = default;
             for (int i = 0; i < sample.Count; i++)
@@ -127,7 +123,7 @@ namespace PgRvn.Server
             Columns["@metadata"] = new PgColumn
             {
                 Name = "@metadata",
-                FormatCode = PgFormat.Text,
+                FormatCode = resultsFormat,
                 TypeModifier = -1,
                 TypeObjectId = PgTypeOIDs.Json,
                 DataTypeSize = -1,
@@ -139,7 +135,7 @@ namespace PgRvn.Server
             Columns["json()"] = new PgColumn
             {
                 Name = "json()",
-                FormatCode = PgFormat.Text,
+                FormatCode = resultsFormat,
                 TypeModifier = -1,
                 TypeObjectId = PgTypeOIDs.Json,
                 DataTypeSize = -1,
@@ -170,6 +166,12 @@ namespace PgRvn.Server
             if (IsEmptyQuery)
             {
                 await writer.WriteAsync(builder.EmptyQueryResponse(), token);
+                return;
+            }
+
+            if (_isInitialPowerBIQuery)
+            {
+                await writer.WriteAsync(builder.CommandComplete($"SELECT 0"), token);
                 return;
             }
 
@@ -220,8 +222,7 @@ namespace PgRvn.Server
                                 value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value);
                                 break;
                             case (BlittableJsonToken.LazyNumber, PgTypeOIDs.Float8):
-                                value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](
-                                    (LazyNumberValue) prop.Value);
+                                value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)]((double)(LazyNumberValue) prop.Value);
                                 break;
                             case (BlittableJsonToken.Null, PgTypeOIDs.Json):
                                 value = Array.Empty<byte>();

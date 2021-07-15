@@ -22,7 +22,7 @@ namespace PgRvn.Server
         protected readonly bool IsEmptyQuery;
         protected Dictionary<string, object> Parameters;
         protected readonly Dictionary<string, PgColumn> Columns;
-        protected short[] ResultColumnFormatCodes;
+        private short[] _resultColumnFormatCodes;
 
         protected PgQuery(string queryString, int[] parametersDataTypes)
         {
@@ -31,17 +31,71 @@ namespace PgRvn.Server
             IsEmptyQuery = string.IsNullOrWhiteSpace(QueryString);
             Parameters = new Dictionary<string, object>();
             Columns = new Dictionary<string, PgColumn>();
-            ResultColumnFormatCodes = Array.Empty<short>();
+            _resultColumnFormatCodes = Array.Empty<short>();
+        }
+
+        private static bool IsPowerBIQuery(ref string queryText, out bool isInitialPowerBIQuery)
+        {
+            // Initial PowerBI query
+            var stmtStart = @"select * 
+from 
+(
+    from";
+
+            if (queryText.StartsWith(stmtStart))
+            {
+                queryText = "from" + queryText.Remove(0, stmtStart.Length);
+
+                var postfix = "\r\n) \"_\"\r\nlimit 0";
+                var postfixIndex = queryText.IndexOf(postfix);
+                queryText = queryText.Remove(postfixIndex);
+
+                isInitialPowerBIQuery = true;
+                return true;
+            }
+
+            // Second PowerBI query
+            if (queryText.StartsWith("select \"$Table\".\"") ||
+                queryText.StartsWith("select \"$pTable\".\""))
+            {
+                var prefix = "from \r\n(\r\n    ";
+                var prefixIndex = queryText.IndexOf(prefix);
+                var postfix = "\r\n) \"$Table\"";
+                var postfixIndex = queryText.IndexOf(postfix);
+                postfixIndex = postfixIndex == -1 ? queryText.IndexOf("\r\n) \"$pTable\"") : postfixIndex;
+                // Note: we ignore the "limit 1000" that is usually provided
+                queryText = queryText.Substring(prefixIndex + prefix.Length, postfixIndex - prefixIndex);
+
+                isInitialPowerBIQuery = false;
+                return true;
+            }
+
+            isInitialPowerBIQuery = false;
+            return false;
         }
 
         public static PgQuery CreateInstance(string queryText, int[] parametersDataTypes, IDocumentStore documentStore)
         {
-            if (queryText.StartsWith("from", StringComparison.CurrentCultureIgnoreCase))
+            bool isInitialPowerBIQuery = false;
+            if (queryText.StartsWith("from", StringComparison.CurrentCultureIgnoreCase) ||
+                IsPowerBIQuery(ref queryText, out isInitialPowerBIQuery))
             {
-                return new RqlQuery(queryText, parametersDataTypes, documentStore);
+                return new RqlQuery(queryText, parametersDataTypes, documentStore, isInitialPowerBIQuery);
             }
 
             return new SqlQuery(queryText, parametersDataTypes);
+        }
+
+        protected PgFormat GetDefaultResultsFormat()
+        {
+            return _resultColumnFormatCodes.Length switch
+            {
+                0 => PgFormat.Text,
+                1 => _resultColumnFormatCodes[0] == 0 ? PgFormat.Text : PgFormat.Binary,
+                _ => throw new NotSupportedException(
+                    "No support for column format code count that isn't 0 or 1, got: " +
+                    _resultColumnFormatCodes.Length) // TODO: Add support
+            };
         }
 
         public abstract Task<ICollection<PgColumn>> Init(bool allowMultipleStatements=false);
@@ -52,7 +106,7 @@ namespace PgRvn.Server
 
         public void Bind(IEnumerable<byte[]> parameters, short[] parameterFormatCodes, short[] resultColumnFormatCodes)
         {
-            ResultColumnFormatCodes = resultColumnFormatCodes;
+            _resultColumnFormatCodes = resultColumnFormatCodes;
 
             if (ParametersDataTypes == null)
             {

@@ -101,8 +101,6 @@ namespace PgRvn.Server
         {
             await CurrentQuery.Execute(messageBuilder, writer, token);
 
-            // todo: handle EmptyQueryResponse
-
             State = TransactionState.Idle;
             return default;
         }

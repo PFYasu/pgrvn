@@ -54,10 +54,7 @@ namespace PgRvn.Server
             var initialMessage = await messageReader.ReadInitialMessage(reader, _token);
             if (initialMessage is SSLRequest)
             {
-                if (!await TryHandleTlsConnection())
-                {
-                    return;
-                }
+                await TryHandleTlsConnection(writer, messageBuilder, _token);
                 initialMessage = await messageReader.ReadInitialMessage(reader, _token);
             }
 
@@ -170,10 +167,12 @@ namespace PgRvn.Server
             }
         }
 
-        private async Task<bool> TryHandleTlsConnection()
+        private async Task TryHandleTlsConnection(PipeWriter writer, MessageBuilder builder, CancellationToken token)
         {
+            // Refuse SSL
+            await writer.WriteAsync(builder.SSLResponse(false), token);
+
             // TODO: Establish SSL, respond with 'S' if willing to perform SSL or 'N' otherwise, etc.
-            return false;
         }
     }
 }

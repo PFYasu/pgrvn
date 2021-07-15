@@ -118,6 +118,64 @@ namespace PgRvn.Server
 
             foreach (var stmt in sqlStatements)
             {
+                Console.WriteLine(QueryString);
+
+                //var powerBIMatch = "\n/*** Load all supported types ***/\nSELECT ns.nspname, a.typname, a.oid, a.typrelid, a.typbasetype,\nCASE WHEN pg_proc.proname='array_recv' THEN "; //'a' ELSE a.typtype END AS type,\nCASE\n  WHEN pg_proc.proname='array_recv' THEN a.typelem\n  WHEN a.typtype='r' THEN rngsubtype\n  ELSE 0\nEND AS elemoid,\nCASE\n  WHEN pg_proc.proname IN ('array_recv','oidvectorrecv') THEN 3    /* Arrays last */\n  WHEN a.typtype='r' THEN 2                                        /* Ranges before */\n  WHEN a.typtype='d' THEN 1                                        /* Domains before */\n  ELSE 0                                                           /* Base types first */\nEND AS ord\nFROM pg_type AS a\nJOIN pg_namespace AS ns ON (ns.oid = a.typnamespace)\nJOIN pg_proc ON pg_proc.oid = a.typreceive\nLEFT OUTER JOIN pg_class AS cls ON (cls.oid = a.typrelid)\nLEFT OUTER JOIN pg_type AS b ON (b.oid = a.typelem)\nLEFT OUTER JOIN pg_class AS elemcls ON (elemcls.oid = b.typrelid)\nLEFT OUTER JOIN pg_range ON (pg_range.rngtypid = a.oid) \nWHERE\n  a.typtype IN ('b', 'r', 'e', 'd') OR         /* Base, range, enum, domain */\n  (a.typtype = 'c' AND cls.relkind='c') OR /* User-defined free-standing composites (not table composites) by default */\n  (pg_proc.proname='array_recv' AND (\n    b.typtype IN ('b', 'r', 'e', 'd') OR       /* Array of base, range, enum, domain */\n    (b.typtype = 'p' AND b.typname IN ('record', 'void')) OR /* Arrays of special supported pseudo-types */\n    (b.typtype = 'c' AND elemcls.relkind='c')  /* Array of user-defined free-standing composites (not table composites) */\n  )) OR\n  (a.typtype = 'p' AND a.typname IN ('record', 'void'))  /* Some special supported pseudo-types */\nORDER BY ord
+                var powerBIMatch = "\n/*** Load all supported types ***/\nSELECT ns.nspname, a.typname, a.oid, a.typrelid, a.typbasetype,\nCASE WHEN pg_proc.proname='array_recv' THEN 'a' ELSE a.typtype END AS type,\nCASE\n  WHEN pg_proc.proname='array_recv' THEN a.typelem\n  WHEN a.typtype='r' THEN rngsubtype\n  ELSE 0\nEND AS elemoid,\nCASE\n  WHEN pg_proc.proname IN ('array_recv','oidvectorrecv') THEN 3    /* Arrays last */\n  WHEN a.typtype='r' THEN 2                                        /* Ranges before */\n  WHEN a.typtype='d' THEN 1                                        /* Domains before */\n  ELSE 0                                                           /* Base types first */\nEND AS ord\nFROM pg_type AS a\nJOIN pg_namespace AS ns ON (ns.oid = a.typnamespace)\nJOIN pg_proc ON pg_proc.oid = a.typreceive\nLEFT OUTER JOIN pg_class AS cls ON (cls.oid = a.typrelid)\nLEFT OUTER JOIN pg_type AS b ON (b.oid = a.typelem)\nLEFT OUTER JOIN pg_class AS elemcls ON (elemcls.oid = b.typrelid)\nLEFT OUTER JOIN pg_range ON (pg_range.rngtypid = a.oid) \nWHERE\n  a.typtype IN ('b', 'r', 'e', 'd') OR         /* Base, range, enum, domain */\n  (a.typtype = 'c' AND cls.relkind='c') OR /* User-defined free-standing composites (not table composites) by default */\n  (pg_proc.proname='array_recv' AND (\n    b.typtype IN ('b', 'r', 'e', 'd') OR       /* Array of base, range, enum, domain */\n    (b.typtype = 'p' AND b.typname IN ('record', 'void')) OR /* Arrays of special supported pseudo-types */\n    (b.typtype = 'c' AND elemcls.relkind='c')  /* Array of user-defined free-standing composites (not table composites) */\n  )) OR\n  (a.typtype = 'p' AND a.typname IN ('record', 'void'))  /* Some special supported pseudo-types */\nORDER BY ord";
+                if (QueryString.Equals(powerBIMatch))
+                {
+                    _result = PgConfig.PowerBIInitialQueryResponse;
+                    return true;
+                }
+
+                powerBIMatch = "/*** Load field definitions for (free-standing) composite types ***/\nSELECT typ.oid, att.attname, att.atttypid\nFROM pg_type AS typ\nJOIN pg_namespace AS ns ON (ns.oid = typ.typnamespace)\nJOIN pg_class AS cls ON (cls.oid = typ.typrelid)\nJOIN pg_attribute AS att ON (att.attrelid = typ.typrelid)\nWHERE\n  (typ.typtype = 'c' AND cls.relkind='c') AND\n  attnum > 0 AND     /* Don't load system attributes */\n  NOT attisdropped\nORDER BY typ.oid, att.attnum";
+
+                if (QueryString.Equals(powerBIMatch))
+                {
+                    _result = PgConfig.PowerBICompositeTypes;
+                    return true;
+                }
+
+                powerBIMatch = "/*** Load enum fields ***/\nSELECT pg_type.oid, enumlabel\nFROM pg_enum\nJOIN pg_type ON pg_type.oid=enumtypid\nORDER BY oid, enumsortorder";
+
+                if (QueryString.Equals(powerBIMatch))
+                {
+                    _result = PgConfig.PowerBIEnumTypes;
+                    return true;
+                }
+
+                var resultsFormat = GetDefaultResultsFormat();
+
+                powerBIMatch = "select character_set_name from INFORMATION_SCHEMA.character_sets";
+                if (QueryString.Equals(powerBIMatch))
+                {
+                    _result = new PgTable
+                    {
+                        Columns = new List<PgColumn>
+                        {
+                            new()
+                            {
+                                Name = "character_set_name",
+                                ColumnIndex = 0,
+                                TypeObjectId = PgTypeOIDs.Name,
+                                DataTypeSize = -1,
+                                FormatCode = resultsFormat
+                            },
+                        },
+                        Data = new List<PgDataRow>
+                        {
+                            new()
+                            {
+                                ColumnData = new ReadOnlyMemory<byte>?[]
+                                {
+                                    Encoding.UTF8.GetBytes("UTF8"),
+                                }
+                            },
+                        }
+                    };
+                    return true;
+                }
+
                 if (stmt.AsSelect != null)
                 {
                     int offset = stmt.AsSelect.BeginPosition;
@@ -138,7 +196,7 @@ namespace PgRvn.Server
 
         private void HandleFunction(TSQLStatement stmt, ref int offset)
         {
-            Console.WriteLine("\ttype: function, value: " + stmt.Tokens[offset].Text);
+            //Console.WriteLine("\ttype: function, value: " + stmt.Tokens[offset].Text);
 
             // todo: handle this better (e.g. check that the query is actually select version() or smth)
             if (stmt.Tokens[offset].Text == "version")
@@ -217,12 +275,12 @@ namespace PgRvn.Server
                 return;
             }
 
-            Console.WriteLine("\ttype: identifier, value: " + stmt.Tokens[offset].Text);
+            //Console.WriteLine("\ttype: identifier, value: " + stmt.Tokens[offset].Text);
         }
 
         private void HandleSelect(TSQLSelectStatement stmt, ref int offset)
         {
-            Console.WriteLine("SELECT:");
+            //Console.WriteLine("SELECT:");
 
             // Go over select tokens
             for (; offset < stmt.Select.Tokens.Count ; offset++)
@@ -238,14 +296,14 @@ namespace PgRvn.Server
                         break;
 
                     default:
-                        Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
+                        //Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
                         break; // todo: throw
                 }
             }
 
             if (stmt.From != null)
             {
-                Console.WriteLine("FROM:");
+                //Console.WriteLine("FROM:");
                 for (var i = 0; i < stmt.From.Tokens.Count; i++)
                 {
                     var token = stmt.From.Tokens[i];
@@ -259,45 +317,45 @@ namespace PgRvn.Server
                         _result = PgConfig.NpgsqlInitialQueryResponse;
                     }
 
-                    Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
+                    //Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
                 }
             }
 
-            if (stmt.Where != null)
-            {
-                Console.WriteLine("WHERE:");
-                foreach (TSQLToken token in stmt.Where.Tokens)
-                {
-                    Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
-                }
-            }
+            //if (stmt.Where != null)
+            //{
+            //    Console.WriteLine("WHERE:");
+            //    foreach (TSQLToken token in stmt.Where.Tokens)
+            //    {
+            //        Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
+            //    }
+            //}
 
-            if (stmt.GroupBy != null)
-            {
-                Console.WriteLine("GROUP BY:");
-                foreach (TSQLToken token in stmt.GroupBy.Tokens)
-                {
-                    Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
-                }
-            }
+            //if (stmt.GroupBy != null)
+            //{
+            //    Console.WriteLine("GROUP BY:");
+            //    foreach (TSQLToken token in stmt.GroupBy.Tokens)
+            //    {
+            //        Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
+            //    }
+            //}
 
-            if (stmt.Having != null)
-            {
-                Console.WriteLine("HAVING:");
-                foreach (TSQLToken token in stmt.Having.Tokens)
-                {
-                    Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
-                }
-            }
+            //if (stmt.Having != null)
+            //{
+            //    Console.WriteLine("HAVING:");
+            //    foreach (TSQLToken token in stmt.Having.Tokens)
+            //    {
+            //        Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
+            //    }
+            //}
 
-            if (stmt.OrderBy != null)
-            {
-                Console.WriteLine("ORDER BY:");
-                foreach (TSQLToken token in stmt.OrderBy.Tokens)
-                {
-                    Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
-                }
-            }
+            //if (stmt.OrderBy != null)
+            //{
+            //    Console.WriteLine("ORDER BY:");
+            //    foreach (TSQLToken token in stmt.OrderBy.Tokens)
+            //    {
+            //        Console.WriteLine("\ttype: " + token.Type.ToString() + ", value: " + token.Text);
+            //    }
+            //}
         }
 
         public override async Task<ICollection<PgColumn>> Init(bool allowMultipleStatements)
