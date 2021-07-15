@@ -64,7 +64,7 @@ from
                 var postfixIndex = queryText.IndexOf(postfix);
                 postfixIndex = postfixIndex == -1 ? queryText.IndexOf("\r\n) \"$pTable\"") : postfixIndex;
                 // Note: we ignore the "limit 1000" that is usually provided
-                queryText = queryText.Substring(prefixIndex + prefix.Length, postfixIndex - prefixIndex);
+                queryText = queryText.Substring(prefixIndex + prefix.Length, postfixIndex - (prefixIndex + prefix.Length));
 
                 isInitialPowerBIQuery = false;
                 return true;
