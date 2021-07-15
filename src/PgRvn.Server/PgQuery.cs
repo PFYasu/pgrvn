@@ -60,14 +60,14 @@ namespace PgRvn.Server
                 return;
             }
 
-            short? defaultDataFormat = null;
+            PgFormat? defaultDataFormat = null;
             switch (parameterFormatCodes.Length)
             {
                 case 0:
-                    defaultDataFormat = (short)PgFormat.Text;
+                    defaultDataFormat = PgFormat.Text;
                     break;
                 case 1:
-                    defaultDataFormat = parameterFormatCodes[0];
+                    defaultDataFormat = parameterFormatCodes[0] == 1 ? PgFormat.Binary : PgFormat.Text;
                     break;
                 default:
                     // todo throw
@@ -83,20 +83,12 @@ namespace PgRvn.Server
                     dataType = ParametersDataTypes[i];
                 }
 
-                short dataFormat = defaultDataFormat ?? parameterFormatCodes[i];
-                object processedParameter = (dataType, dataFormat) switch
+                var dataFormat = defaultDataFormat ?? (parameterFormatCodes[i] == 1 ? PgFormat.Binary : PgFormat.Text);
+                object processedParameter = parameter;
+                if (PgTypeConverter.FromBytes.TryGetValue((dataType, dataFormat), out var fromBytesFunc))
                 {
-                    (PgTypeOIDs.Bool, (short)PgFormat.Binary) => PgConfig.TrueBuffer.SequenceEqual(parameter),
-                    (PgTypeOIDs.Text, (short)PgFormat.Text) => Encoding.UTF8.GetString(parameter),
-                    (PgTypeOIDs.Json, (short)PgFormat.Text) => Encoding.UTF8.GetString(parameter),
-                    (PgTypeOIDs.Int2, (short)PgFormat.Binary) => IPAddress.NetworkToHostOrder(BitConverter.ToInt16(parameter)),
-                    (PgTypeOIDs.Int4, (short)PgFormat.Binary) => IPAddress.NetworkToHostOrder(BitConverter.ToInt32(parameter)),
-                    (PgTypeOIDs.Int8, (short)PgFormat.Binary) => IPAddress.NetworkToHostOrder(BitConverter.ToInt64(parameter)),
-                    (PgTypeOIDs.Float4, (short)PgFormat.Binary) => BitConverter.ToSingle(parameter.Reverse().ToArray()),
-                    (PgTypeOIDs.Float8, (short)PgFormat.Binary) => BitConverter.ToDouble(parameter.Reverse().ToArray()),
-                    // (PgTypeOIDs.Char, (short)PgFormat.Binary) => BitConverter.ToChar(parameter.Reverse().ToArray()), // TODO: Test char support
-                    _ => parameter
-                };
+                    processedParameter = fromBytesFunc(parameter);
+                }
 
                 Parameters.Add($"p{i + 1}", processedParameter);
                 i++;

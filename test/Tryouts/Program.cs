@@ -108,7 +108,7 @@ namespace Tryouts
 
             // InitODBC();
 
-            Thread.Sleep(1000 * 60 * 5);
+            Console.ReadLine();
 
             // TODO: Figure out why Npgsql doesn't handle our ErrorResponse messages gracefully
             // using var conn = new NpgsqlConnection(connString);
