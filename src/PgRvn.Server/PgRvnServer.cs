@@ -64,6 +64,7 @@ namespace PgRvn.Server
                     Console.WriteLine(e);
                     throw;
                 }
+
                 _connections.TryAdd(client, HandleConnection(client));
             }
         }

@@ -27,7 +27,7 @@ namespace PgRvn.Server
 
             return protocolVersion switch
             {
-                (int) ProtocolVersion.CancelMessage => new Cancel(),
+                (int) ProtocolVersion.CancelMessage => await Cancel(msgLen, reader, token),
                 (int) ProtocolVersion.TlsConnection => new SSLRequest(),
                 _ => await StartupMessage(protocolVersion, msgLen, reader, token)
             };
@@ -63,6 +63,30 @@ namespace PgRvn.Server
             {
                 ProtocolVersion = ProtocolVersion.Version3,
                 ClientOptions = clientOptions
+            };
+        }
+
+        private async Task<Cancel> Cancel(int msgLen, PipeReader reader, CancellationToken token)
+        {
+            // Length field
+            msgLen -= sizeof(int);
+
+            var processId = await ReadInt32Async(reader, token);
+            msgLen -= sizeof(int);
+
+            var sessionId = await ReadInt32Async(reader, token);
+            msgLen -= sizeof(int);
+
+            if (msgLen != 0)
+            {
+                throw new PgFatalException(PgErrorCodes.ProtocolViolation,
+                    $"Message is bigger than specified in msgLen field - {msgLen} extra bytes in message.");
+            }
+
+            return new Cancel
+            {
+                ProcessId = processId,
+                SessionId = sessionId
             };
         }
 

@@ -70,7 +70,7 @@ namespace PgRvn.Server
                         PgErrorCodes.ProtocolViolation, 
                         "SSLRequest received twice"), _token);
                     return;
-                case Cancel:
+                case Cancel cancel:
                     // TODO: Support Cancel message
                     await writer.WriteAsync(messageBuilder.ErrorResponse(
                         PgSeverity.Fatal,
@@ -104,9 +104,6 @@ namespace PgRvn.Server
                     e.Message), _token);
                 return;
             }
-
-            // TODO: Send a NoData message from Describe if no rows will be returned
-            // TODO: Send a EmptyQueryResponse message from Execute if no rows were returned
 
             try
             {

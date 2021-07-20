@@ -176,6 +176,8 @@ namespace PgRvn.Server
 
     public class Cancel : Message
     {
+        public int ProcessId;
+        public int SessionId;
     }
 
     public class SSLRequest : Message
