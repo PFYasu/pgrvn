@@ -78,6 +78,7 @@ from
         {
             bool isInitialPowerBIQuery = false;
             if (queryText.StartsWith("from", StringComparison.CurrentCultureIgnoreCase) ||
+                queryText.StartsWith("/*rql*/", StringComparison.CurrentCultureIgnoreCase) ||
                 IsPowerBIQuery(ref queryText, out isInitialPowerBIQuery))
             {
                 return new RqlQuery(queryText, parametersDataTypes, documentStore, isInitialPowerBIQuery);

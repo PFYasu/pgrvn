@@ -110,12 +110,11 @@ namespace Tryouts
 
             Console.ReadLine();
 
-            // TODO: Figure out why Npgsql doesn't handle our ErrorResponse messages gracefully
-            // using var conn = new NpgsqlConnection(connString);
-            // conn.Open();
+            using var conn = new NpgsqlConnection(connString);
+            conn.Open();
 
 
-            // Select(conn, "select * from users"); 
+            //Select(conn, "from Orders as o where id() = 'orders/829-A' update { o.Freight = \"13.31\"}"); 
 //            Select(conn, "select version()"); 
 //            Select(conn, @"
 // SELECT ns.nspname, typ_and_elem_type.*,

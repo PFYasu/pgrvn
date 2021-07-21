@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Raven.Client.Documents;
+using Raven.Client.Documents.Operations;
 using Raven.Client.Documents.Queries;
 using Raven.Client.Documents.Session;
 using Sparrow.Json;
@@ -17,14 +18,17 @@ namespace PgRvn.Server
 {
     public class RqlQuery : PgQuery
     {
+        private readonly IDocumentStore _documentStore;
         private readonly IAsyncDocumentSession _session;
         private QueryResult _result;
         private bool _hasId;
         private bool _hasIncludes;
         private bool _isInitialPowerBIQuery;
+        private Operation _operation;
 
         public RqlQuery(string queryString, int[] parametersDataTypes, IDocumentStore documentStore, bool isInitialPowerBIQuery) : base(queryString, parametersDataTypes)
         {
+            _documentStore = documentStore;
             _session = documentStore.OpenAsyncSession();
             _isInitialPowerBIQuery = isInitialPowerBIQuery; // TODO: If true, limit results to 0 (don't send results, just schema)
         }
@@ -45,16 +49,29 @@ namespace PgRvn.Server
         public async Task RunRqlQuery()
         {
             var query = _session.Advanced.AsyncRawQuery<BlittableJsonReaderObject>(QueryString);
-
+            var patchParams = new Raven.Client.Parameters();
+            
             if (Parameters != null)
             {
                 foreach (var (key, value) in Parameters)
                 {
                     query.AddParameter(key, value);
+                    patchParams.Add(key, value);
                 }
             }
 
-            _result = await ((AsyncDocumentQuery<BlittableJsonReaderObject>)query).GetQueryResultAsync();
+            try
+            {
+                _result = await ((AsyncDocumentQuery<BlittableJsonReaderObject>)query).GetQueryResultAsync();
+            }
+            catch (Raven.Client.Exceptions.RavenException)
+            {
+                _operation = _documentStore.Operations.Send(new PatchByQueryOperation(new IndexQuery
+                {
+                    Query = QueryString,
+                    QueryParameters = patchParams
+                }));
+            }
         }
 
         private ICollection<PgColumn> GenerateSchema()
@@ -172,6 +189,15 @@ namespace PgRvn.Server
             if (_isInitialPowerBIQuery)
             {
                 await writer.WriteAsync(builder.CommandComplete($"SELECT 0"), token);
+                return;
+            }
+
+            if (_operation != null)
+            {
+                // todo: is this a safe cast?
+                var result = (BulkOperationResult)await _operation.WaitForCompletionAsync();
+
+                await writer.WriteAsync(builder.CommandComplete($"UPDATE {result.Total}"), token);
                 return;
             }
 
