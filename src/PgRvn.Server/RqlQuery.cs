@@ -60,6 +60,7 @@ namespace PgRvn.Server
                 }
             }
 
+            // TODO: Find a better solution for running Patch RQL
             try
             {
                 _result = await ((AsyncDocumentQuery<BlittableJsonReaderObject>)query).GetQueryResultAsync();
@@ -98,7 +99,7 @@ namespace PgRvn.Server
                     Name = "id()",
                     FormatCode = resultsFormat,
                     TypeModifier = -1,
-                    TypeObjectId = PgTypeOIDs.Text,
+                    TypeObjectId = PgTypeOIDs.Json,
                     DataTypeSize = -1,
                     ColumnIndex = 0,
                     TableObjectId = 0
@@ -137,16 +138,16 @@ namespace PgRvn.Server
                 };
             }
 
-            Columns["@metadata"] = new PgColumn
-            {
-                Name = "@metadata",
-                FormatCode = resultsFormat,
-                TypeModifier = -1,
-                TypeObjectId = PgTypeOIDs.Json,
-                DataTypeSize = -1,
-                ColumnIndex = (short)Columns.Count,
-                TableObjectId = 0
-            };
+            //Columns["@metadata"] = new PgColumn
+            //{
+            //    Name = "@metadata",
+            //    FormatCode = resultsFormat,
+            //    TypeModifier = -1,
+            //    TypeObjectId = PgTypeOIDs.Text,
+            //    DataTypeSize = -1,
+            //    ColumnIndex = (short)Columns.Count,
+            //    TableObjectId = 0
+            //};
 
 
             Columns["json()"] = new PgColumn

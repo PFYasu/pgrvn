@@ -35,6 +35,9 @@ namespace PgRvn.Server
 
             [(PgTypeOIDs.Float8, PgFormat.Text)] = Utf8GetBytes,
             [(PgTypeOIDs.Float8, PgFormat.Binary)] = (obj) => BitConverter.GetBytes((double)obj).Reverse().ToArray(),
+
+            [(PgTypeOIDs.Bytea, PgFormat.Text)] = (obj) => (byte[])obj, // TODO: Verify it works
+            [(PgTypeOIDs.Bytea, PgFormat.Binary)] = (obj) => (byte[])obj,
         };
 
         private static byte[] Utf8GetBytes(object obj)
@@ -72,6 +75,9 @@ namespace PgRvn.Server
 
             [(PgTypeOIDs.Float8, PgFormat.Text)] = (buffer) => double.Parse(Utf8GetString(buffer)),
             [(PgTypeOIDs.Float8, PgFormat.Binary)] = (buffer) => BitConverter.ToDouble(buffer.Reverse().ToArray()),
+
+            [(PgTypeOIDs.Bytea, PgFormat.Text)] = (buffer) => buffer, // TODO: Verify it works
+            [(PgTypeOIDs.Bytea, PgFormat.Binary)] = (buffer) => buffer,
         };
     }
 }

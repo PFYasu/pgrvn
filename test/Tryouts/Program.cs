@@ -73,19 +73,53 @@ namespace Tryouts
         {
             //var connectionString = "Driver={PostgreSQL Unicode};Server=127.0.0.1;Port=5432;Database=BookStore;Uid=postgres;Pwd=123456;";
             var connectionString = "Driver={PostgreSQL Unicode};Server=127.0.0.1;Port=5433;Database=Northwind;Uid=postgres;Pwd=123456;";
-            var cnDb = new OdbcConnection(connectionString);
-            cnDb.Open();
+            var conn = new OdbcConnection(connectionString);
+            conn.Open();
 
-            // Create a dataset
-            var dsDB = new DataSet();
-            var adDB = new OdbcDataAdapter();
-            var cbDB = new OdbcCommandBuilder(adDB);
-            adDB.SelectCommand = new OdbcCommand("from Employees", cnDb);
-            adDB.Fill(dsDB);
+            var cmd = conn.CreateCommand();
+            //cmd.CommandText = "from Employees where FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ?";
+            //cmd.CommandText = "SELECT * FROM \"Customers\" WHERE bigint = ?";
+            cmd.CommandText = "from Employees where FirstName = ? or FirstName = ?";
+            cmd.Parameters.Add("@BigInt", OdbcType.BigInt).Value = long.MaxValue;
+            cmd.Parameters.Add("@Binary", OdbcType.Binary).Value = new byte[] { 0x42, 0x43 };
+            //cmd.Parameters.Add("@Bit", OdbcType.Bit).Value = false;
+            //cmd.Parameters.Add("@Char", OdbcType.Char).Value = 'a';
+            //cmd.Parameters.Add("@Date", OdbcType.Date).Value = new DateTime(2000, 1, 1);
+            //cmd.Parameters.Add("@DateTime", OdbcType.DateTime).Value = new DateTime(2000, 2, 2, 2, 2, 2);
+            //cmd.Parameters.Add("@Decimal", OdbcType.Decimal).Value = (decimal)15.3;
+            //cmd.Parameters.Add("@Double", OdbcType.Double).Value = (double)123.123123;
+            //cmd.Parameters.Add("@Image", OdbcType.Image).Value = new byte[] { 0x1, 0x2 };
+            //cmd.Parameters.Add("@Int", OdbcType.Int).Value = 5;
+            //cmd.Parameters.Add("@NChar", OdbcType.NChar).Value = "Hello World";
+            //cmd.Parameters.Add("@NText", OdbcType.NText).Value = "Hello World";
+            //cmd.Parameters.Add("@Numeric", OdbcType.Numeric).Value = (decimal)15.3;
+            //cmd.Parameters.Add("@NVarChar", OdbcType.NVarChar).Value = "Hello World";
+            //cmd.Parameters.Add("@Real", OdbcType.Real).Value = (float)13.37;
+            //cmd.Parameters.Add("@SmallDateTime", OdbcType.SmallDateTime).Value = new DateTime(2000, 3, 3);
+            //cmd.Parameters.Add("@SmallInt", OdbcType.SmallInt).Value = (short)2;
+            //cmd.Parameters.Add("@Text", OdbcType.Text).Value = "Hello World";
+            //cmd.Parameters.Add("@Time", OdbcType.Time).Value = new TimeSpan(1, 1, 1, 1);
+            //cmd.Parameters.Add("@Timestamp", OdbcType.Timestamp).Value = new byte[] { 0x42, 0x43 };
+            //cmd.Parameters.Add("@TinyInt", OdbcType.TinyInt).Value = 0x1;
+            //cmd.Parameters.Add("@UniqueIdentifier", OdbcType.UniqueIdentifier).Value = new Guid(new byte[] { 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16 });
+            //cmd.Parameters.Add("@VarBinary", OdbcType.VarBinary).Value = new byte[] { 0x1, 0x2 };
+            //cmd.Parameters.Add("@VarChar", OdbcType.VarChar).Value = "Hello World";
 
-            // Display the record count
-            dsDB.Tables[0].Print();
-            // Console.WriteLine($"Table contains {dsDB.Tables[0].Rows.Count} rows.\n");
+            using var reader = cmd.ExecuteReader();
+
+            var dt1 = new DataTable();
+            var dt2 = new DataTable();
+
+            var ds = new DataSet();
+            ds.Tables.Add(dt1);
+            ds.Tables.Add(dt2);
+
+            ds.EnforceConstraints = false;
+
+            ds.Load(reader, LoadOption.OverwriteChanges, dt1, dt2);
+
+            dt1.Print();
+            dt2.Print();
         }
 
         static void Main(string[] args)
@@ -106,63 +140,26 @@ namespace Tryouts
             // var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
             var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
 
-            // InitODBC();
+            //InitODBC();
 
             Console.ReadLine();
 
-            using var conn = new NpgsqlConnection(connString);
-            conn.Open();
+            //using var conn = new NpgsqlConnection(connString);
+            //conn.Open();
+
+            //Select(conn, "from Employees where Address.City = @city or Address.City = @test or Address.City = @test2 or Address.City = @test3 or Address.City = @test4", new Dictionary<string, object>
+            //{
+            //    ["city"] = 's',
+            //    ["test"] = 1234,
+            //    ["test2"] = (float)13.37,
+            //    ["test3"] = false,
+            //    ["test4"] = (double)-4.234320
+            //});
 
 
-            //Select(conn, "from Orders as o where id() = 'orders/829-A' update { o.Freight = \"13.31\"}"); 
-//            Select(conn, "select version()"); 
-//            Select(conn, @"
-// SELECT ns.nspname, typ_and_elem_type.*,
-//   CASE
-//       WHEN typtype IN ('b', 'e', 'p') THEN 0           -- First base types, enums, pseudo-types
-//       WHEN typtype = 'r' THEN 1                        -- Ranges after
-//       WHEN typtype = 'c' THEN 2                        -- Composites after
-//       WHEN typtype = 'd' AND elemtyptype <> 'a' THEN 3 -- Domains over non-arrays after
-//       WHEN typtype = 'a' THEN 4                        -- Arrays before
-//       WHEN typtype = 'd' AND elemtyptype = 'a' THEN 5  -- Domains over arrays last
-//    END AS ord
-//FROM (
-//    -- Arrays have typtype=b - this subquery identifies them by their typreceive and converts their typtype to a
-//    -- We first do this for the type (innerest-most subquery), and then for its element type
-//    -- This also returns the array element, range subtype and domain base type as elemtypoid
-//    SELECT
-//        typ.oid, typ.typnamespace, typ.typname, typ.typtype, typ.typrelid, typ.typnotnull, typ.relkind,
-//        elemtyp.oid AS elemtypoid, elemtyp.typname AS elemtypname, elemcls.relkind AS elemrelkind,
-//        CASE WHEN elemproc.proname='array_recv' THEN 'a' ELSE elemtyp.typtype END AS elemtyptype
-//    FROM (
-//        SELECT typ.oid, typnamespace, typname, typrelid, typnotnull, relkind, typelem AS elemoid,
-//            CASE WHEN proc.proname='array_recv' THEN 'a' ELSE typ.typtype END AS typtype,
-//            CASE
-//                WHEN proc.proname='array_recv' THEN typ.typelem
-//                WHEN typ.typtype='r' THEN rngsubtype
-//                WHEN typ.typtype='d' THEN typ.typbasetype
-//            END AS elemtypoid
-//        FROM pg_type AS typ
-//        LEFT JOIN pg_class AS cls ON (cls.oid = typ.typrelid)
-//        LEFT JOIN pg_proc AS proc ON proc.oid = typ.typreceive
-//        LEFT JOIN pg_range ON (pg_range.rngtypid = typ.oid)
-//    ) AS typ
-//    LEFT JOIN pg_type AS elemtyp ON elemtyp.oid = elemtypoid
-//    LEFT JOIN pg_class AS elemcls ON (elemcls.oid = elemtyp.typrelid)
-//    LEFT JOIN pg_proc AS elemproc ON elemproc.oid = elemtyp.typreceive
-//) AS typ_and_elem_type
-//JOIN pg_namespace AS ns ON (ns.oid = typnamespace)
-//WHERE
-//    typtype IN ('b', 'r', 'e', 'd') OR -- Base, range, enum, domain
-//    (typtype = 'c' AND relkind='c') OR -- User-defined free-standing composites (not table composites) by default
-//    (typtype = 'p' AND typname IN ('record', 'void')) OR -- Some special supported pseudo-types
-//    (typtype = 'a' AND (  -- Array of...
-//        elemtyptype IN ('b', 'r', 'e', 'd') OR -- Array of base, range, enum, domain
-//        (elemtyptype = 'p' AND elemtypname IN ('record', 'void')) OR -- Arrays of special supported pseudo-types
-//        (elemtyptype = 'c' AND elemrelkind='c') -- Array of user-defined free-standing composites (not table composites) by default
-//    ))
-//ORDER BY ord");
-            //SelectMulti(conn, "from Employees select FirstName");
+            // Select(conn, "from Orders as o where id() = 'orders/829-A' update { o.Freight = \"13.31\"}");
+            // Select(conn, "select version()"); 
+            // SelectMulti(conn, "from Employees select FirstName");
             // SelectMulti(conn, "select @test1; select @test2", new Dictionary<string, object>
             // {
             //     ["test1"] = 1,
@@ -176,10 +173,6 @@ namespace Tryouts
             // Select(conn, "from Orders select Company, OrderedAt, Freight"); // map index projection
             // Select(conn, "from index 'Orders/Totals' select Company, OrderedAt, Freight"); // map index projection
             // Select(conn, "from Employees as e select { FullName: e.FirstName + ' ' + e.LastName } "); // projection via js
-            //Select(conn, "from Employees where Address.City = @city", new Dictionary<string, object>
-            //{
-            //    ["city"] = "Seattle"
-            //}); // with args
             // Select(conn, "from Orders include Employee limit 3 "); // with include
             //Select(conn, "thisisbad"); // invalid query
             // Select(conn, "from x"); // Empty results

@@ -5,6 +5,7 @@ using System.IO.Pipelines;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -38,7 +39,38 @@ namespace PgRvn.Server
                     "Named statements are not supported.");
             }
 
-            CurrentQuery = PgQuery.CreateInstance(message.Query.Replace("$", "$p"), message.ParametersDataTypes, DocumentStore);
+            // Extract optional parameter types (e.g. $1::int4)
+            var foundParamTypes = new List<string>();
+            var cleanQueryText = new Regex(@"(?<=(\$[0-9]))(::[A-Za-z0-9]+)?").Replace(message.Query, new MatchEvaluator((Match match) =>
+            {
+                foundParamTypes.Add(match.Value);
+                return "";
+            }));
+
+            if (message.ParametersDataTypes.Length < foundParamTypes.Count)
+            {
+                var arr = message.ParametersDataTypes;
+                message.ParametersDataTypes = new int[foundParamTypes.Count];
+                arr.CopyTo(message.ParametersDataTypes.AsSpan());
+            }
+
+            for (int i = 0; i < foundParamTypes.Count; i++)
+            {
+                if (message.ParametersDataTypes[i] == 0)
+                {
+                    message.ParametersDataTypes[i] = foundParamTypes[i] switch
+                    {
+                        "::int8" => PgTypeOIDs.Int8,
+                        "::bytea" => PgTypeOIDs.Bytea,
+                        _ => 0
+                    };
+                }
+            }
+
+            // Change $1 to $p1 because RQL doesn't accept numeric named paramters
+            cleanQueryText = new Regex(@"(?<=\$)([0-9])").Replace(cleanQueryText, "p$0");
+
+            CurrentQuery = PgQuery.CreateInstance(cleanQueryText, message.ParametersDataTypes, DocumentStore);
 
             State = TransactionState.InTransaction;
             return messageBuilder.ParseComplete();
