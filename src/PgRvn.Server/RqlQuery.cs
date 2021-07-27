@@ -50,7 +50,6 @@ namespace PgRvn.Server
         {
             var query = _session.Advanced.AsyncRawQuery<BlittableJsonReaderObject>(QueryString);
             var patchParams = new Raven.Client.Parameters();
-            
             if (Parameters != null)
             {
                 foreach (var (key, value) in Parameters)
@@ -115,17 +114,36 @@ namespace PgRvn.Server
 
                 var (type, size) = (prop.Token & BlittableJsonReaderBase.TypesMask) switch
                 {
-                    BlittableJsonToken.Boolean => (PgTypeOIDs.Bool, PgConfig.TrueBuffer.Length),
                     BlittableJsonToken.CompressedString => (PgTypeOIDs.Text, -1),
+                    BlittableJsonToken.String => (PgTypeOIDs.Text, -1),
+                    BlittableJsonToken.Boolean => (PgTypeOIDs.Bool, PgConfig.TrueBuffer.Length),
                     BlittableJsonToken.EmbeddedBlittable => (PgTypeOIDs.Json, -1),
                     BlittableJsonToken.Integer => (PgTypeOIDs.Int8, sizeof(long)),
                     BlittableJsonToken.LazyNumber => (PgTypeOIDs.Float8, sizeof(double)),
                     BlittableJsonToken.Null => (PgTypeOIDs.Json, -1),
-                    BlittableJsonToken.String => (PgTypeOIDs.Text, -1),
                     BlittableJsonToken.StartArray => (PgTypeOIDs.Json, -1),
                     BlittableJsonToken.StartObject => (PgTypeOIDs.Json, -1),
                     _ => throw new NotSupportedException()
                 };
+
+                string val = (prop.Token & BlittableJsonReaderBase.TypesMask) switch
+                {
+                    BlittableJsonToken.CompressedString => (string)prop.Value,
+                    BlittableJsonToken.String => (LazyStringValue)prop.Value,
+                    _ => null
+                };
+
+                if (val != null && TryConvertStringValue(val, out object output))
+                {
+                    type = output switch
+                    {
+                        DateTime => PgTypeOIDs.Timestamp, // TODO: Maybe use Time ?
+                        DateTimeOffset => PgTypeOIDs.TimestampTz, // TODO: Maybe use TimeTz ?
+                        TimeSpan => PgTypeOIDs.Time, // TODO: Maybe use Interval ? (see: https://www.npgsql.org/doc/types/datetime.html)
+                        _ => type
+                    };
+                }
+
                 Columns[prop.Name] = new PgColumn
                 {
                     Name = prop.Name,
@@ -177,6 +195,26 @@ namespace PgRvn.Server
             }
 
             return Columns.Values;
+        }
+
+        // TODO: Taken from TypeConverter.cs in Raven.Server - use that when migrating
+        private static unsafe bool TryConvertStringValue(string value, out object output)
+        {
+            output = null;
+
+            fixed (char* str = value)
+            {
+                var result = LazyStringParser.TryParseDateTime(str, value.Length, out DateTime dt, out DateTimeOffset dto);
+                if (result == LazyStringParser.Result.DateTime)
+                    output = dt;
+                if (result == LazyStringParser.Result.DateTimeOffset)
+                    output = dto;
+
+                if (LazyStringParser.TryParseTimeSpan(str, value.Length, out var ts))
+                    output = ts;
+            }
+
+            return output != null;
         }
 
         public override async Task Execute(MessageBuilder builder, PipeWriter writer, CancellationToken token)
@@ -250,6 +288,10 @@ namespace PgRvn.Server
                                 break;
                             case (BlittableJsonToken.LazyNumber, PgTypeOIDs.Float8):
                                 value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)]((double)(LazyNumberValue) prop.Value);
+                                break;
+
+                            case (BlittableJsonToken.String, PgTypeOIDs.Float8):
+                                value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)]((double)(LazyStringValue)prop.Value);
                                 break;
                             case (BlittableJsonToken.Null, PgTypeOIDs.Json):
                                 value = Array.Empty<byte>();

@@ -58,12 +58,12 @@ namespace PgRvn.Server
 
         // Date/Time
         public const int Date = 1082;
-        public const int Time = 1083;
-        public const int Timestamp = 1114;
-        public const int TimestampTz = 1184;
+        public const int Time = 1083; // Time without timezone
+        public const int Timestamp = 1114; // Timestamp without timezone
+        public const int TimestampTz = 1184; // Timestamp with timezone
         public const int Interval = 1186;
-        public const int TimeTz = 1266;
-        public const int Abstime = 702;
+        public const int TimeTz = 1266; // Time with timezone
+        //public const int Abstime = 702;
 
         // Network address
         public const int Inet = 869;

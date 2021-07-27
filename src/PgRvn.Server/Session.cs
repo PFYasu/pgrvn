@@ -11,21 +11,35 @@ namespace PgRvn.Server
     public class PgFatalException : Exception
     {
         public string ErrorCode;
-        public string Description;
 
         /// <summary>
         /// Creates an Postgres exception to be sent back to the client
         /// </summary>
         /// <param name="errorCode">A Postgres error code (SqlState). See <see cref="PgErrorCodes"/></param>
         /// <param name="errorMessage">Error message</param>
-        /// <param name="description">Error description</param>
         /// <returns>ErrorResponse message</returns>
-        public PgFatalException(string errorCode, string errorMessage, string description = null) : base(errorMessage)
+        public PgFatalException(string errorCode, string errorMessage) : base(errorMessage)
         {
             ErrorCode = errorCode;
-            Description = description;
         }
     }
+
+    public class PgErrorException : Exception
+    {
+        public string ErrorCode;
+
+        /// <summary>
+        /// Creates an Postgres exception to be sent back to the client
+        /// </summary>
+        /// <param name="errorCode">A Postgres error code (SqlState). See <see cref="PgErrorCodes"/></param>
+        /// <param name="errorMessage">Error message</param>
+        /// <returns>ErrorResponse message</returns>
+        public PgErrorException(string errorCode, string errorMessage) : base(errorMessage)
+        {
+            ErrorCode = errorCode;
+        }
+    }
+
     public class Session
     {
         private readonly TcpClient _client;
@@ -124,20 +138,31 @@ namespace PgRvn.Server
                     if (transaction.State == TransactionState.Failed && message is not Sync)
                         continue;
 
-                    var response = message switch
+                    try
                     {
-                        Parse parse => transaction.Parse(parse, messageBuilder),
-                        Bind bind => transaction.Bind(bind, messageBuilder),
-                        Sync => transaction.Sync(messageBuilder),
-                        Describe describe => await transaction.Describe(describe, messageBuilder, writer, _token),
-                        Execute => await transaction.Execute(messageBuilder, writer, _token),
-                        Query query => await transaction.Query(query, messageBuilder, writer, _token),
-                        Close close => transaction.Close(close, messageBuilder),
-                        Flush => await transaction.Flush(writer, _token),
-                        _ => throw new PgFatalException(PgErrorCodes.ProtocolViolation, "Unrecognized message type")
-                    };
+                        var response = message switch
+                        {
+                            Parse parse => transaction.Parse(parse, messageBuilder),
+                            Bind bind => transaction.Bind(bind, messageBuilder),
+                            Sync => transaction.Sync(messageBuilder),
+                            Describe describe => await transaction.Describe(describe, messageBuilder, writer, _token),
+                            Execute => await transaction.Execute(messageBuilder, writer, _token),
+                            Query query => await transaction.Query(query, messageBuilder, writer, _token),
+                            Close close => transaction.Close(close, messageBuilder),
+                            Flush => await transaction.Flush(writer, _token),
+                            _ => throw new PgFatalException(PgErrorCodes.ProtocolViolation, "Unrecognized message type")
+                        };
 
-                    await writer.WriteAsync(response, _token);
+                        await writer.WriteAsync(response, _token);
+                    }
+                    catch (PgErrorException e)
+                    {
+                        await writer.WriteAsync(messageBuilder.ErrorResponse(
+                            PgSeverity.Error,
+                            e.ErrorCode,
+                            e.Message,
+                            e.ToString()), _token);
+                    }
                 }
             }
             catch (PgFatalException e)
@@ -146,7 +171,7 @@ namespace PgRvn.Server
                     PgSeverity.Fatal,
                     e.ErrorCode,
                     e.Message,
-                    e.Description), _token);
+                    e.ToString()), _token);
             }
             catch (Exception e)
             {

@@ -144,6 +144,10 @@ from
                 {
                     processedParameter = fromBytesFunc(parameter);
                 }
+                else
+                {
+                    processedParameter = PgTypeConverter.FromBytes[(0, dataFormat)](parameter);
+                }
 
                 Parameters.Add($"p{i + 1}", processedParameter);
                 i++;

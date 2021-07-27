@@ -76,19 +76,26 @@ namespace Tryouts
             var conn = new OdbcConnection(connectionString);
             conn.Open();
 
+            // SELECT * FROM Customers WHERE field = $1
+
             var cmd = conn.CreateCommand();
-            //cmd.CommandText = "from Employees where FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ? or FirstName = ?";
-            //cmd.CommandText = "SELECT * FROM \"Customers\" WHERE bigint = ?";
-            cmd.CommandText = "from Employees where FirstName = ? or FirstName = ?";
-            cmd.Parameters.Add("@BigInt", OdbcType.BigInt).Value = long.MaxValue;
-            cmd.Parameters.Add("@Binary", OdbcType.Binary).Value = new byte[] { 0x42, 0x43 };
+            //cmd.CommandText = "SELECT ? from \"Customers\"";
+            cmd.CommandText = "from Products where Discontinued = ?";
+            // from Products where Discontinued = $1::int8
+            // Parse - ParameterType - 25
+
+            // from Products where Discontinued = $1
+            // Parse - ParameterType - 0
+
+            //cmd.Parameters.Add("@BigInt", OdbcType.BigInt).Value = long.MaxValue;
+            //cmd.Parameters.Add("@Binary", OdbcType.Binary).Value = new byte[] { 0x42, 0x43 };
             //cmd.Parameters.Add("@Bit", OdbcType.Bit).Value = false;
             //cmd.Parameters.Add("@Char", OdbcType.Char).Value = 'a';
             //cmd.Parameters.Add("@Date", OdbcType.Date).Value = new DateTime(2000, 1, 1);
             //cmd.Parameters.Add("@DateTime", OdbcType.DateTime).Value = new DateTime(2000, 2, 2, 2, 2, 2);
             //cmd.Parameters.Add("@Decimal", OdbcType.Decimal).Value = (decimal)15.3;
             //cmd.Parameters.Add("@Double", OdbcType.Double).Value = (double)123.123123;
-            //cmd.Parameters.Add("@Image", OdbcType.Image).Value = new byte[] { 0x1, 0x2 };
+            //cmd.Parameters.Add("@Image", OdbcType.Image).Value = new byte[] { 0x1, 0x2, 0x3, 0x4 };
             //cmd.Parameters.Add("@Int", OdbcType.Int).Value = 5;
             //cmd.Parameters.Add("@NChar", OdbcType.NChar).Value = "Hello World";
             //cmd.Parameters.Add("@NText", OdbcType.NText).Value = "Hello World";
@@ -140,21 +147,18 @@ namespace Tryouts
             // var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
             var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
 
-            //InitODBC();
+            // InitODBC();
 
-            Console.ReadLine();
+            //Console.ReadLine();
 
-            //using var conn = new NpgsqlConnection(connString);
-            //conn.Open();
+            using var conn = new NpgsqlConnection(connString);
+            conn.Open();
 
-            //Select(conn, "from Employees where Address.City = @city or Address.City = @test or Address.City = @test2 or Address.City = @test3 or Address.City = @test4", new Dictionary<string, object>
-            //{
-            //    ["city"] = 's',
-            //    ["test"] = 1234,
-            //    ["test2"] = (float)13.37,
-            //    ["test3"] = false,
-            //    ["test4"] = (double)-4.234320
-            //});
+            var dto = new DateTimeOffset(new DateTime(1998, 5, 6), new TimeSpan(4 ,0, 0));
+            Select(conn, "from Orders where OrderedAt = @param1", new Dictionary<string, object>
+            {
+                ["param1"] = dto
+            });
 
 
             // Select(conn, "from Orders as o where id() = 'orders/829-A' update { o.Freight = \"13.31\"}");

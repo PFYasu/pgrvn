@@ -13,6 +13,9 @@ namespace PgRvn.Server
         public delegate byte[] ToBytesDelegate(object obj);
         public delegate object FromBytesDelegate(byte[] buffer);
 
+        private const long _pgTimestampOffsetTicks = 630822816000000000L;
+
+
         public static readonly Dictionary<(int, PgFormat), ToBytesDelegate> ToBytes = new()
         {
             [(PgTypeOIDs.Bool, PgFormat.Text)] = (obj) => (bool)obj ? Utf8GetBytes("t") : Utf8GetBytes("f"), // TODO confirm this works
@@ -38,6 +41,12 @@ namespace PgRvn.Server
 
             [(PgTypeOIDs.Bytea, PgFormat.Text)] = (obj) => (byte[])obj, // TODO: Verify it works
             [(PgTypeOIDs.Bytea, PgFormat.Binary)] = (obj) => (byte[])obj,
+
+            [(PgTypeOIDs.Timestamp, PgFormat.Text)] = (obj) => Utf8GetBytes(GetTimestamp((DateTime)obj)), // TODO: Verify it works
+            [(PgTypeOIDs.Timestamp, PgFormat.Binary)] = (obj) => BitConverter.GetBytes(IPAddress.HostToNetworkOrder(GetTimestamp((DateTime)obj))),
+
+            [(PgTypeOIDs.TimestampTz, PgFormat.Text)] = (obj) => Utf8GetBytes(GetTimestampTz((DateTime)obj)), // TODO: Verify it works
+            [(PgTypeOIDs.TimestampTz, PgFormat.Binary)] = (obj) => BitConverter.GetBytes(IPAddress.HostToNetworkOrder(GetTimestampTz((DateTime)obj))),
         };
 
         private static byte[] Utf8GetBytes(object obj)
@@ -50,8 +59,35 @@ namespace PgRvn.Server
             return Encoding.UTF8.GetString(buffer);
         }
 
+        private static long GetTimestamp(DateTime timestamp)
+        {
+            return (timestamp.Ticks - _pgTimestampOffsetTicks) / 10;
+        }
+
+        private static DateTime GetTimestamp(long timestamp)
+        {
+            return new DateTime(timestamp * 10 + _pgTimestampOffsetTicks);
+        }
+
+        private static long GetTimestampTz(DateTimeOffset timestamp)
+        {
+            return (timestamp.Ticks - _pgTimestampOffsetTicks) / 10;
+        }
+
+        private static DateTimeOffset GetTimestampTz(long timestamp)
+        {
+            return new DateTime(timestamp * 10 + _pgTimestampOffsetTicks).ToLocalTime();
+        }
+
         public static readonly Dictionary<(int, PgFormat), FromBytesDelegate> FromBytes = new()
         {
+            // For unknown types
+            [(0, PgFormat.Text)] = Utf8GetString,
+            [(0, PgFormat.Binary)] = (buffer) => buffer,
+
+            [(PgTypeOIDs.Bit, PgFormat.Text)] = (buffer) => Utf8GetString(buffer).Equals("1"), // TODO: Test if works
+            [(PgTypeOIDs.Bit, PgFormat.Binary)] = (buffer) => buffer.Equals(PgConfig.TrueBuffer), // TODO: Test if works
+
             [(PgTypeOIDs.Bool, PgFormat.Text)] = (buffer) => Utf8GetString(buffer).Equals("t"),
             [(PgTypeOIDs.Bool, PgFormat.Binary)] = (buffer) => buffer.Equals(PgConfig.TrueBuffer),
 
@@ -78,6 +114,12 @@ namespace PgRvn.Server
 
             [(PgTypeOIDs.Bytea, PgFormat.Text)] = (buffer) => buffer, // TODO: Verify it works
             [(PgTypeOIDs.Bytea, PgFormat.Binary)] = (buffer) => buffer,
+
+            [(PgTypeOIDs.Timestamp, PgFormat.Text)] = (buffer) => GetTimestamp(long.Parse(Utf8GetString(buffer))), // TODO: Verify it works
+            [(PgTypeOIDs.Timestamp, PgFormat.Binary)] = (buffer) => GetTimestamp(IPAddress.NetworkToHostOrder(BitConverter.ToInt64(buffer))),
+
+            [(PgTypeOIDs.TimestampTz, PgFormat.Text)] = (buffer) => GetTimestampTz(long.Parse(Utf8GetString(buffer))), // TODO: Verify it works
+            [(PgTypeOIDs.TimestampTz, PgFormat.Binary)] = (buffer) => GetTimestampTz(IPAddress.NetworkToHostOrder(BitConverter.ToInt64(buffer))),
         };
     }
 }

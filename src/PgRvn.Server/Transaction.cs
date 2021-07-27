@@ -62,7 +62,10 @@ namespace PgRvn.Server
                     {
                         "::int8" => PgTypeOIDs.Int8,
                         "::bytea" => PgTypeOIDs.Bytea,
-                        _ => 0
+                        "::bit" => PgTypeOIDs.Bit,
+                        _ => throw new PgErrorException(PgErrorCodes.AmbiguousParameter, 
+                                "Couldn't determine parameter type, try explicitly providing it in your query " +
+                                "(e.g. from Orders where Freight = $1::double)")
                     };
                 }
             }
@@ -102,7 +105,7 @@ namespace PgRvn.Server
             }
 
             CurrentQuery.Bind(message.Parameters, message.ParameterFormatCodes, message.ResultColumnFormatCodes);
-
+            
             return messageBuilder.BindComplete();
         }
 
