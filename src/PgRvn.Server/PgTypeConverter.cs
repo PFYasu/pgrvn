@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using Sparrow.Json;
@@ -42,11 +43,28 @@ namespace PgRvn.Server
             [(PgTypeOIDs.Bytea, PgFormat.Text)] = (obj) => (byte[])obj, // TODO: Verify it works
             [(PgTypeOIDs.Bytea, PgFormat.Binary)] = (obj) => (byte[])obj,
 
-            [(PgTypeOIDs.Timestamp, PgFormat.Text)] = (obj) => Utf8GetBytes(GetTimestamp((DateTime)obj)), // TODO: Verify it works
+            [(PgTypeOIDs.Timestamp, PgFormat.Text)] = Utf8GetBytes, // TODO: Verify it works
             [(PgTypeOIDs.Timestamp, PgFormat.Binary)] = (obj) => BitConverter.GetBytes(IPAddress.HostToNetworkOrder(GetTimestamp((DateTime)obj))),
 
-            [(PgTypeOIDs.TimestampTz, PgFormat.Text)] = (obj) => Utf8GetBytes(GetTimestampTz((DateTime)obj)), // TODO: Verify it works
+            [(PgTypeOIDs.TimestampTz, PgFormat.Text)] = Utf8GetBytes, // TODO: Verify it works
             [(PgTypeOIDs.TimestampTz, PgFormat.Binary)] = (obj) => BitConverter.GetBytes(IPAddress.HostToNetworkOrder(GetTimestampTz((DateTime)obj))),
+
+            [(PgTypeOIDs.Interval, PgFormat.Text)] = Utf8GetBytes, // TODO: Verify it works
+            [(PgTypeOIDs.Interval, PgFormat.Binary)] = (obj) =>
+            {
+                var ts = (TimeSpan)obj;
+                var arr = new byte[sizeof(long) + sizeof(int) + sizeof(int)];
+                
+                var ticksBuf = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(ts.Ticks / 10));
+                var daysBuf = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(ts.Days));
+                var monthsBuf = BitConverter.GetBytes(0);
+
+                ticksBuf.CopyTo(arr, 0);
+                daysBuf.CopyTo(arr, sizeof(long));
+                monthsBuf.CopyTo(arr, sizeof(long) + sizeof(int));
+
+                return arr;
+            }, // TODO: Verify it works
         };
 
         private static byte[] Utf8GetBytes(object obj)
@@ -64,9 +82,9 @@ namespace PgRvn.Server
             return (timestamp.Ticks - _pgTimestampOffsetTicks) / 10;
         }
 
-        private static DateTime GetTimestamp(long timestamp)
+        private static DateTime GetTimestamp(string datetimeStr)
         {
-            return new DateTime(timestamp * 10 + _pgTimestampOffsetTicks);
+            return DateTime.Parse(datetimeStr);
         }
 
         private static long GetTimestampTz(DateTimeOffset timestamp)
@@ -74,9 +92,40 @@ namespace PgRvn.Server
             return (timestamp.Ticks - _pgTimestampOffsetTicks) / 10;
         }
 
-        private static DateTimeOffset GetTimestampTz(long timestamp)
+        private static DateTime GetTimestampTz(string datetimeStr)
         {
-            return new DateTime(timestamp * 10 + _pgTimestampOffsetTicks).ToLocalTime();
+            var dt = DateTime.Parse(datetimeStr);
+            dt.ToUniversalTime(); // TODO: Test that this line doesn't change the DateTime, just the .Kind property
+            return dt;
+        }
+
+        private static DateTime GetTimestamp(long timestamp)
+        {
+            return new DateTime(timestamp * 10 + _pgTimestampOffsetTicks);
+        }
+
+        private static DateTime GetTimestampTz(long timestamp)
+        {
+            return new DateTime(timestamp * 10 + _pgTimestampOffsetTicks, DateTimeKind.Utc);
+        }
+
+        private static object GetTimeSpan(byte[] buffer)
+        {
+            var pos = 0;
+            var spanView = new ReadOnlySpan<byte>(buffer);
+            
+            var ticks = MemoryMarshal.AsRef<long>(spanView);
+            pos += sizeof(long);
+
+            var day = MemoryMarshal.AsRef<int>(spanView[pos..]);
+            pos += sizeof(int);
+
+            var month = MemoryMarshal.AsRef<int>(spanView[pos..]);
+            pos += sizeof(int);
+
+            //var ts = new TimeSpan(IPAddress.NetworkToHostOrder(BitConverter.ToInt64(buffer));
+
+            return new TimeSpan();
         }
 
         public static readonly Dictionary<(int, PgFormat), FromBytesDelegate> FromBytes = new()
@@ -115,11 +164,14 @@ namespace PgRvn.Server
             [(PgTypeOIDs.Bytea, PgFormat.Text)] = (buffer) => buffer, // TODO: Verify it works
             [(PgTypeOIDs.Bytea, PgFormat.Binary)] = (buffer) => buffer,
 
-            [(PgTypeOIDs.Timestamp, PgFormat.Text)] = (buffer) => GetTimestamp(long.Parse(Utf8GetString(buffer))), // TODO: Verify it works
+            [(PgTypeOIDs.Timestamp, PgFormat.Text)] = (buffer) => GetTimestamp(Utf8GetString(buffer)), // TODO: Verify it works
             [(PgTypeOIDs.Timestamp, PgFormat.Binary)] = (buffer) => GetTimestamp(IPAddress.NetworkToHostOrder(BitConverter.ToInt64(buffer))),
 
-            [(PgTypeOIDs.TimestampTz, PgFormat.Text)] = (buffer) => GetTimestampTz(long.Parse(Utf8GetString(buffer))), // TODO: Verify it works
+            [(PgTypeOIDs.TimestampTz, PgFormat.Text)] = (buffer) => GetTimestampTz(Utf8GetString(buffer)), // TODO: Verify it works
             [(PgTypeOIDs.TimestampTz, PgFormat.Binary)] = (buffer) => GetTimestampTz(IPAddress.NetworkToHostOrder(BitConverter.ToInt64(buffer))),
+
+            [(PgTypeOIDs.Interval, PgFormat.Text)] = (buffer) => TimeSpan.Parse(Utf8GetString(buffer)), // TODO: Verify it works
+            [(PgTypeOIDs.Interval, PgFormat.Binary)] = GetTimeSpan,
         };
     }
 }

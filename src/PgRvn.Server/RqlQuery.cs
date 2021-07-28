@@ -135,13 +135,27 @@ namespace PgRvn.Server
 
                 if (val != null && TryConvertStringValue(val, out object output))
                 {
-                    type = output switch
+                    switch (output)
                     {
-                        DateTime => PgTypeOIDs.Timestamp, // TODO: Maybe use Time ?
-                        DateTimeOffset => PgTypeOIDs.TimestampTz, // TODO: Maybe use TimeTz ?
-                        TimeSpan => PgTypeOIDs.Time, // TODO: Maybe use Interval ? (see: https://www.npgsql.org/doc/types/datetime.html)
-                        _ => type
-                    };
+                        case DateTime dt:
+                            size = 8;
+                            type = PgTypeOIDs.Timestamp;
+                            if (dt.Kind == DateTimeKind.Utc)
+                                type = PgTypeOIDs.TimestampTz;
+                            break;
+
+                        case DateTimeOffset:
+                            type = PgTypeOIDs.TimestampTz;
+                            size = 8;
+                            break;
+
+                        case TimeSpan:
+                            type = PgTypeOIDs.Interval;
+                            size = 16;
+                            break;
+                        default:
+                            break;
+                    }
                 }
 
                 Columns[prop.Name] = new PgColumn
@@ -290,8 +304,54 @@ namespace PgRvn.Server
                                 value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)]((double)(LazyNumberValue) prop.Value);
                                 break;
 
+                            case (BlittableJsonToken.CompressedString, PgTypeOIDs.Timestamp):
+                            case (BlittableJsonToken.CompressedString, PgTypeOIDs.TimestampTz):
+                            case (BlittableJsonToken.CompressedString, PgTypeOIDs.Interval):
+                                {
+                                    if (((string)prop.Value).Length != 0 && 
+                                        TryConvertStringValue((string)prop.Value, out object obj))
+                                    {
+                                        value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](obj);
+                                    }
+                                    break;
+                                }
+                            case (BlittableJsonToken.String, PgTypeOIDs.Timestamp):
+                            case (BlittableJsonToken.String, PgTypeOIDs.TimestampTz):
+                            case (BlittableJsonToken.String, PgTypeOIDs.Interval):
+                                {
+                                    if (((LazyStringValue)prop.Value).Length != 0 && 
+                                        TryConvertStringValue((string)(LazyStringValue)prop.Value, out object obj))
+                                    {
+                                        // TODO: Make pretty
+                                        // Check for mismatch between column type and our data type
+                                        if (obj is DateTime dt)
+                                        {
+                                            if (dt.Kind == DateTimeKind.Utc && pgColumn.TypeObjectId != PgTypeOIDs.TimestampTz)
+                                            {
+                                                break;
+                                            }
+                                            else if (dt.Kind != DateTimeKind.Utc && pgColumn.TypeObjectId != PgTypeOIDs.Timestamp)
+                                            {
+                                                break;
+                                            }
+                                        }
+
+                                        if (obj is DateTimeOffset && pgColumn.TypeObjectId != PgTypeOIDs.TimestampTz)
+                                        {
+                                            break;
+                                        }
+
+                                        if (obj is TimeSpan && pgColumn.TypeObjectId != PgTypeOIDs.Interval)
+                                        {
+                                            break;
+                                        }
+
+                                        value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](obj);
+                                    }
+                                    break;
+                                }
                             case (BlittableJsonToken.String, PgTypeOIDs.Float8):
-                                value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)]((double)(LazyStringValue)prop.Value);
+                                value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](double.Parse((LazyStringValue)prop.Value));
                                 break;
                             case (BlittableJsonToken.Null, PgTypeOIDs.Json):
                                 value = Array.Empty<byte>();

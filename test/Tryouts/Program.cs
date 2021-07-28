@@ -20,7 +20,7 @@ namespace Tryouts
             }
         }
 
-        static void Select(NpgsqlConnection conn, string query, Dictionary<string,object> namedArgs = null)
+        static void Select(NpgsqlConnection conn, string query, Dictionary<string, (NpgsqlDbType, object)> namedArgs = null)
         {
             using var cmd = new NpgsqlCommand(query, conn);
             Console.WriteLine(query);
@@ -29,7 +29,7 @@ namespace Tryouts
                 foreach (var (key, val) in namedArgs)
                 {
                     Console.WriteLine($"\t{key} = {val}");
-                    cmd.Parameters.AddWithValue(key, val);
+                    cmd.Parameters.AddWithValue(key, val.Item1, val.Item2);
                 }
             }
             
@@ -41,7 +41,7 @@ namespace Tryouts
             dt.Print();
         }
 
-        static void SelectMulti(NpgsqlConnection conn, string query, Dictionary<string, object> namedArgs = null)
+        static void SelectMulti(NpgsqlConnection conn, string query, Dictionary<string, (NpgsqlDbType, object)> namedArgs = null)
         {
             using var cmd = new NpgsqlCommand(query, conn);
             Console.WriteLine(query);
@@ -50,7 +50,7 @@ namespace Tryouts
                 foreach (var (key, val) in namedArgs)
                 {
                     Console.WriteLine($"\t{key} = {val}");
-                    cmd.Parameters.AddWithValue(key, val);
+                    cmd.Parameters.AddWithValue(key, val.Item1, val.Item2);
                 }
             }
 
@@ -80,7 +80,9 @@ namespace Tryouts
 
             var cmd = conn.CreateCommand();
             //cmd.CommandText = "SELECT ? from \"Customers\"";
-            cmd.CommandText = "from Products where Discontinued = ?";
+            //cmd.CommandText = "from Products where Discontinued = ?";
+            cmd.CommandText = "from index 'Stocks_ByTradeVolume' as f where f.Company = 'Alfreds Futterkiste'";
+            //cmd.CommandText = "from index 'Stocks_ByTradeVolume' as f where f.Company = 'Alfreds Futterkiste' select { adv: new Date(f.Date).toJSON() }";
             // from Products where Discontinued = $1::int8
             // Parse - ParameterType - 25
 
@@ -147,18 +149,20 @@ namespace Tryouts
             // var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
             var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
 
-            // InitODBC();
+            //InitODBC();
 
-            //Console.ReadLine();
+            Console.ReadLine();
 
-            using var conn = new NpgsqlConnection(connString);
-            conn.Open();
+            //using var conn = new NpgsqlConnection(connString);
+            //conn.Open();
 
-            var dto = new DateTimeOffset(new DateTime(1998, 5, 6), new TimeSpan(4 ,0, 0));
-            Select(conn, "from Orders where OrderedAt = @param1", new Dictionary<string, object>
-            {
-                ["param1"] = dto
-            });
+            //var dto = new DateTimeOffset(new DateTime(1998, 5, 5, 4, 0, 0), new TimeSpan(4 ,0, 0));
+            ////var dto = new NpgsqlDateTime(1998, 5, 5, 0, 0, 0, DateTimeKind.Utc); 
+            ////var dto = new NpgsqlDateTime(1998, 5, 5, 0, 0, 0, DateTimeKind.Local);
+            //Select(conn, "from Orders where OrderedAtUtc = @param1", new Dictionary<string, (NpgsqlDbType, object)>
+            //{
+            //    ["param1"] = (NpgsqlDbType.TimestampTz, dto)
+            //});
 
 
             // Select(conn, "from Orders as o where id() = 'orders/829-A' update { o.Freight = \"13.31\"}");

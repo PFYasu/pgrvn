@@ -317,6 +317,7 @@ namespace PgRvn.Server
 
             return (result, (int)match.Length + 1);
         }
+
         private async Task<ReadResult> ReadMinimumOf(PipeReader reader, int minSizeRequired, CancellationToken token)
         {
             var read = await reader.ReadAsync(token);
@@ -333,57 +334,57 @@ namespace PgRvn.Server
         private async Task<byte[]> ReadBytesAsync(PipeReader reader, int length, CancellationToken token)
         {
             var read = await ReadMinimumOf(reader, length, token);
-            return ReadBytes(read, reader, length);
+            return ReadBytes(read.Buffer, reader, length);
         }
 
         private async Task<int> ReadInt32Async(PipeReader reader, CancellationToken token)
         {
             var read = await ReadMinimumOf(reader, sizeof(int), token);
-            return ReadInt32(read, reader);
+            return ReadInt32(read.Buffer, reader);
         }
 
         private async Task<short> ReadInt16Async(PipeReader reader, CancellationToken token)
         {
             var read = await ReadMinimumOf(reader, sizeof(int), token);
-            return ReadInt16(read, reader);
+            return ReadInt16(read.Buffer, reader);
         }
 
         private async Task<byte> ReadByteAsync(PipeReader reader, CancellationToken token)
         {
             var read = await ReadMinimumOf(reader, sizeof(byte), token);
-            return ReadByte(read, reader);
+            return ReadByte(read.Buffer, reader);
         }
 
-        private static byte[] ReadBytes(ReadResult read, PipeReader reader, int length)
+        private byte[] ReadBytes(ReadOnlySequence<byte> readBuffer, PipeReader reader, int length)
         {
-            var sequence = read.Buffer.Slice(0, length);
+            var sequence = readBuffer.Slice(0, length);
             var buffer = new byte[length];
             sequence.CopyTo(buffer);
             reader.AdvanceTo(sequence.End);
             return buffer;
         }
 
-        private static int ReadInt32(ReadResult read, PipeReader reader)
+        private int ReadInt32(ReadOnlySequence<byte> readBuffer, PipeReader reader)
         {
-            var sequence = read.Buffer.Slice(0, sizeof(int));
+            var sequence = readBuffer.Slice(0, sizeof(int));
             Span<byte> buffer = stackalloc byte[sizeof(int)];
             sequence.CopyTo(buffer);
             reader.AdvanceTo(sequence.End);
             return IPAddress.NetworkToHostOrder(MemoryMarshal.AsRef<int>(buffer));
         }
 
-        private static short ReadInt16(ReadResult read, PipeReader reader)
+        private short ReadInt16(ReadOnlySequence<byte> readBuffer, PipeReader reader)
         {
-            var sequence = read.Buffer.Slice(0, sizeof(short));
+            var sequence = readBuffer.Slice(0, sizeof(short));
             Span<byte> buffer = stackalloc byte[sizeof(short)];
             sequence.CopyTo(buffer);
             reader.AdvanceTo(sequence.End);
             return IPAddress.NetworkToHostOrder(MemoryMarshal.AsRef<short>(buffer));
         }
-        private static byte ReadByte(ReadResult read, PipeReader reader)
+        private byte ReadByte(ReadOnlySequence<byte> readBuffer, PipeReader reader)
         {
-            var charByte = read.Buffer.First.Span[0];
-            reader.AdvanceTo(read.Buffer.GetPosition(sizeof(byte), read.Buffer.Start));
+            var charByte = readBuffer.First.Span[0];
+            reader.AdvanceTo(readBuffer.GetPosition(sizeof(byte), readBuffer.Start));
             return charByte;
         }
     }
