@@ -199,7 +199,6 @@ namespace PgRvn.Server
                 msgLen -= sizeof(int);
 
                 // TODO: Is it okay to allocate up to 2GB of data based on external output?
-                // TODO: Format as bytes vs. text depending on the format codes given
                 parameters.Add(await ReadBytesAsync(reader, parameterLength, token));
                 msgLen -= parameterLength;
             }

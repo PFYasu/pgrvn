@@ -49,7 +49,7 @@ namespace PgRvn.Server
             [(PgTypeOIDs.TimestampTz, PgFormat.Text)] = (obj) => Encoding.UTF8.GetBytes(((DateTime)obj).ToString("yyyy-MM-dd HH:mm:ss.fffffffzz")), // TODO: Verify it works
             [(PgTypeOIDs.TimestampTz, PgFormat.Binary)] = (obj) => BitConverter.GetBytes(IPAddress.HostToNetworkOrder(GetTimestampTz((DateTime)obj))),
 
-            [(PgTypeOIDs.Interval, PgFormat.Text)] = Utf8GetBytes, // TODO: Verify it works
+            [(PgTypeOIDs.Interval, PgFormat.Text)] = Utf8GetBytes,
             [(PgTypeOIDs.Interval, PgFormat.Binary)] = (obj) =>
             {
                 var ts = (TimeSpan)obj;

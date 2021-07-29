@@ -71,6 +71,9 @@ namespace PgRvn.Server
         /// <param name="errorCode">A Postgres error code (SqlState). See <see cref="PgErrorCodes"/></param>
         /// <param name="errorMessage">Error message</param>
         /// <param name="description">Error description</param>
+        /// <remarks>
+        /// More fields that aren't currently supported - https://www.postgresql.org/docs/current/protocol-error-fields.html
+        /// </remarks>
         /// <returns>ErrorResponse message</returns>
         public ReadOnlyMemory<byte> ErrorResponse(string severity, string errorCode, string errorMessage, string description=null)
         {
@@ -100,8 +103,6 @@ namespace PgRvn.Server
             }
 
             WriteByte(0, Buffer.Span, ref pos);
-
-            // TODO: Support writing more fields, see: https://www.postgresql.org/docs/current/protocol-error-fields.html
 
             // Write length
             WriteInt32(pos - sizeof(byte), Buffer.Span, ref tempPos);

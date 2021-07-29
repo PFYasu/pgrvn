@@ -149,15 +149,14 @@ namespace Tryouts
             //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
             var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
 
-            InitODBC();
+            //InitODBC();
 
-            //Console.ReadLine();
+            Console.ReadLine();
 
-            //using var conn = new NpgsqlConnection(connString);
-            //conn.Open();
+            //using var conn = new NpgsqlConnection(connString); conn.Open();
 
-            var dto = DateTime.Parse("1998-05-05T01:02:03.0405060");
-            //var dto = new TimeSpan(1, 2, 3, 4);
+            //var dto = DateTime.Parse("1998-05-05T01:02:03.0405060Z");
+            ////var dto = new TimeSpan(1, 2, 3, 4);
             //Select(conn, "from Orders where OrderedAtUtc = @param1", new Dictionary<string, (NpgsqlDbType, object)>
             //{
             //    ["param1"] = (NpgsqlDbType.TimestampTz, dto)

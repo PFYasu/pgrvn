@@ -145,7 +145,7 @@ namespace PgRvn.Server
 
         public async Task<ReadOnlyMemory<byte>> Query(Query message, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
-            // TODO: Handle query
+            // TODO: Support multiple statements in one query
             var query = PgQuery.CreateInstance(message.QueryString, null, DocumentStore);
 
             var schema = await query.Init(true);

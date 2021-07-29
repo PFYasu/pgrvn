@@ -95,11 +95,11 @@ from
                 1 => _resultColumnFormatCodes[0] == 0 ? PgFormat.Text : PgFormat.Binary,
                 _ => throw new NotSupportedException(
                     "No support for column format code count that isn't 0 or 1, got: " +
-                    _resultColumnFormatCodes.Length) // TODO: Add support
+                    _resultColumnFormatCodes.Length)
             };
         }
 
-        public abstract Task<ICollection<PgColumn>> Init(bool allowMultipleStatements=false);
+        public abstract Task<ICollection<PgColumn>> Init(bool allowMultipleStatements = false);
 
         public abstract Task Execute(MessageBuilder builder, PipeWriter writer, CancellationToken token);
 
@@ -108,12 +108,6 @@ from
         public void Bind(IEnumerable<byte[]> parameters, short[] parameterFormatCodes, short[] resultColumnFormatCodes)
         {
             _resultColumnFormatCodes = resultColumnFormatCodes;
-
-            if (ParametersDataTypes == null)
-            {
-                // todo throw
-                return;
-            }
 
             PgFormat? defaultDataFormat = null;
             switch (parameterFormatCodes.Length)
@@ -125,7 +119,6 @@ from
                     defaultDataFormat = parameterFormatCodes[0] == 1 ? PgFormat.Binary : PgFormat.Text;
                     break;
                 default:
-                    // todo throw
                     break;
             }
 

@@ -6,6 +6,7 @@ namespace PgRvn.Server
 {
     public static class PgConfig
     {
+        // TODO: Customize these
         public static readonly Dictionary<string, string> ParameterStatusList = new()
         {
             ["client_encoding"] = "UTF8",
@@ -15,10 +16,10 @@ namespace PgRvn.Server
             ["DataStyle"] = "ISO, DMY",
             ["integer_datetimes"] = "on",
             ["IntervalStyle"] = "postgres",
-            ["is_superuser"] = "on", // TODO
+            ["is_superuser"] = "on",
             ["session_authorization"] = "postgres",
             ["standard_conforming_strings"] = "on",
-            ["TimeZone"] = "Asia/Jerusalem", // TODO
+            ["TimeZone"] = "Asia/Jerusalem",
         };
 
         public static byte[] TrueBuffer = { 1 }, FalseBuffer = { 0 };

@@ -30,7 +30,7 @@ namespace PgRvn.Server
         {
             _documentStore = documentStore;
             _session = documentStore.OpenAsyncSession();
-            _isInitialPowerBIQuery = isInitialPowerBIQuery; // TODO: If true, limit results to 0 (don't send results, just schema)
+            _isInitialPowerBIQuery = isInitialPowerBIQuery;
         }
 
         public override async Task<ICollection<PgColumn>> Init(bool allowMultipleStatements = false)
@@ -39,8 +39,6 @@ namespace PgRvn.Server
             {
                 return default;
             }
-
-            // todo: handle allowMultipleStatements
 
             await RunRqlQuery();
             return GenerateSchema();
