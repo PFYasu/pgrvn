@@ -98,7 +98,7 @@ namespace PgRvn.Server
                     Name = "id()",
                     FormatCode = resultsFormat,
                     TypeModifier = -1,
-                    TypeObjectId = PgTypeOIDs.Json,
+                    TypeObjectId = PgTypeOIDs.Text,
                     DataTypeSize = -1,
                     ColumnIndex = 0,
                     TableObjectId = 0
