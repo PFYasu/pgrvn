@@ -55,7 +55,7 @@ namespace PgRvn.Server
                 var ts = (TimeSpan)obj;
                 var arr = new byte[sizeof(long) + sizeof(int) + sizeof(int)];
                 
-                var ticksBuf = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(((ts.Ticks - ts.Days * TimeSpan.TicksPerDay) / 10)));
+                var ticksBuf = BitConverter.GetBytes(IPAddress.HostToNetworkOrder((ts.Ticks - ts.Days * TimeSpan.TicksPerDay) / 10));
                 var daysBuf = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(ts.Days));
                 var monthsBuf = BitConverter.GetBytes(0);
 
@@ -92,10 +92,9 @@ namespace PgRvn.Server
             return (timestamp.Ticks - _pgTimestampOffsetTicks) / 10;
         }
 
-        private static DateTime GetTimestampTz(string datetimeStr)
+        private static DateTimeOffset GetTimestampTz(string datetimeStr)
         {
-            var dt = DateTime.Parse(datetimeStr);
-            dt.ToUniversalTime(); // TODO: Test that this line doesn't change the DateTime, just the .Kind property
+            var dt = DateTimeOffset.Parse(datetimeStr).ToOffset(TimeSpan.Zero);
             return dt;
         }
 
@@ -114,23 +113,16 @@ namespace PgRvn.Server
             var pos = 0;
             var spanView = new ReadOnlySpan<byte>(buffer);
             
-            var ticks = MemoryMarshal.AsRef<long>(spanView);
+            var ticks = IPAddress.NetworkToHostOrder(MemoryMarshal.AsRef<long>(spanView));
             pos += sizeof(long);
 
-            var day = MemoryMarshal.AsRef<int>(spanView[pos..]);
+            var days = IPAddress.NetworkToHostOrder(MemoryMarshal.AsRef<int>(spanView[pos..]));
             pos += sizeof(int);
 
-            var month = MemoryMarshal.AsRef<int>(spanView[pos..]);
+            var months = IPAddress.NetworkToHostOrder(MemoryMarshal.AsRef<int>(spanView[pos..]));
             pos += sizeof(int);
 
-            //var ts = new TimeSpan(IPAddress.NetworkToHostOrder(BitConverter.ToInt64(buffer));
-
-
-
-            // TODO: Make this work
-
-
-            return new TimeSpan();
+            return new TimeSpan((ticks * 10) + (days * TimeSpan.TicksPerDay));
         }
 
         public static readonly Dictionary<(int, PgFormat), FromBytesDelegate> FromBytes = new()

@@ -81,7 +81,7 @@ namespace Tryouts
             var cmd = conn.CreateCommand();
             //cmd.CommandText = "SELECT ? from \"Customers\"";
             //cmd.CommandText = "from Products where Discontinued = ?";
-            cmd.CommandText = "from index 'Stocks_ByTradeVolume' as f where f.Company = 'Alfreds Futterkiste'";
+            cmd.CommandText = "from Orders where OrderedAtUtc = ?::timestamptz";
             //cmd.CommandText = "from index 'Stocks_ByTradeVolume' as f where f.Company = 'Alfreds Futterkiste' select { adv: new Date(f.Date).toJSON() }";
             // from Products where Discontinued = $1::int8
             // Parse - ParameterType - 25
@@ -94,7 +94,7 @@ namespace Tryouts
             //cmd.Parameters.Add("@Bit", OdbcType.Bit).Value = false;
             //cmd.Parameters.Add("@Char", OdbcType.Char).Value = 'a';
             //cmd.Parameters.Add("@Date", OdbcType.Date).Value = new DateTime(2000, 1, 1);
-            //cmd.Parameters.Add("@DateTime", OdbcType.DateTime).Value = new DateTime(2000, 2, 2, 2, 2, 2);
+            cmd.Parameters.Add("@DateTime", OdbcType.DateTime).Value = DateTime.Parse("1998-05-05T01:02:03.0405060Z"); //.0405060Z
             //cmd.Parameters.Add("@Decimal", OdbcType.Decimal).Value = (decimal)15.3;
             //cmd.Parameters.Add("@Double", OdbcType.Double).Value = (double)123.123123;
             //cmd.Parameters.Add("@Image", OdbcType.Image).Value = new byte[] { 0x1, 0x2, 0x3, 0x4 };
@@ -149,23 +149,21 @@ namespace Tryouts
             //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
             var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
 
-            //InitODBC();
+            InitODBC();
 
             //Console.ReadLine();
 
-            using var conn = new NpgsqlConnection(connString);
-            conn.Open();
+            //using var conn = new NpgsqlConnection(connString);
+            //conn.Open();
 
             var dto = DateTime.Parse("1998-05-05T01:02:03.0405060");
-            //var dto = new DateTimeOffset(new DateTime(1998, 5, 5, 5, 2, 3), new TimeSpan(4, 0, 0));
-            //var dto = new NpgsqlDateTime(1998, 5, 5, 0, 0, 0, DateTimeKind.Utc); 
-            //var dto = new NpgsqlDateTime(1998, 5, 5, 0, 0, 0, DateTimeKind.Local);
+            //var dto = new TimeSpan(1, 2, 3, 4);
             //Select(conn, "from Orders where OrderedAtUtc = @param1", new Dictionary<string, (NpgsqlDbType, object)>
             //{
-            //    ["param1"] = (NpgsqlDbType.Timestamp, dto)
+            //    ["param1"] = (NpgsqlDbType.TimestampTz, dto)
             //});
 
-            Select(conn, "from Orders as o where o.Company = \"TestCompany\""); 
+            //Select(conn, "from Orders as o where o.Company = \"TestCompany\""); 
             //Select(conn, "SELECT * FROM \"Customers\"");
 
             // Select(conn, "from Orders as o where id() = 'orders/829-A' update { o.Freight = \"13.31\"}");

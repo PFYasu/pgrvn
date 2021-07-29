@@ -63,6 +63,9 @@ namespace PgRvn.Server
                         "::int8" => PgTypeOIDs.Int8,
                         "::bytea" => PgTypeOIDs.Bytea,
                         "::bit" => PgTypeOIDs.Bit,
+                        "::timestamptz" => PgTypeOIDs.TimestampTz,
+                        "::timestamp" => PgTypeOIDs.Timestamp,
+                        "::interval" => PgTypeOIDs.Interval,
                         _ => throw new PgErrorException(PgErrorCodes.AmbiguousParameter, 
                                 "Couldn't determine parameter type, try explicitly providing it in your query " +
                                 "(e.g. from Orders where Freight = $1::double)")
