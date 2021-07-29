@@ -146,24 +146,27 @@ namespace Tryouts
                 return;
             }
 
-            // var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
+            //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
             var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
 
             //InitODBC();
 
-            Console.ReadLine();
+            //Console.ReadLine();
 
-            //using var conn = new NpgsqlConnection(connString);
-            //conn.Open();
+            using var conn = new NpgsqlConnection(connString);
+            conn.Open();
 
-            //var dto = new DateTimeOffset(new DateTime(1998, 5, 5, 4, 0, 0), new TimeSpan(4 ,0, 0));
-            ////var dto = new NpgsqlDateTime(1998, 5, 5, 0, 0, 0, DateTimeKind.Utc); 
-            ////var dto = new NpgsqlDateTime(1998, 5, 5, 0, 0, 0, DateTimeKind.Local);
+            var dto = DateTime.Parse("1998-05-05T01:02:03.0405060");
+            //var dto = new DateTimeOffset(new DateTime(1998, 5, 5, 5, 2, 3), new TimeSpan(4, 0, 0));
+            //var dto = new NpgsqlDateTime(1998, 5, 5, 0, 0, 0, DateTimeKind.Utc); 
+            //var dto = new NpgsqlDateTime(1998, 5, 5, 0, 0, 0, DateTimeKind.Local);
             //Select(conn, "from Orders where OrderedAtUtc = @param1", new Dictionary<string, (NpgsqlDbType, object)>
             //{
-            //    ["param1"] = (NpgsqlDbType.TimestampTz, dto)
+            //    ["param1"] = (NpgsqlDbType.Timestamp, dto)
             //});
 
+            Select(conn, "from Orders as o where o.Company = \"TestCompany\""); 
+            //Select(conn, "SELECT * FROM \"Customers\"");
 
             // Select(conn, "from Orders as o where id() = 'orders/829-A' update { o.Freight = \"13.31\"}");
             // Select(conn, "select version()"); 

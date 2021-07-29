@@ -55,7 +55,7 @@ namespace PgRvn.Server
                 var ts = (TimeSpan)obj;
                 var arr = new byte[sizeof(long) + sizeof(int) + sizeof(int)];
                 
-                var ticksBuf = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(ts.Ticks / 10));
+                var ticksBuf = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(((ts.Ticks - ts.Days * TimeSpan.TicksPerDay) / 10)));
                 var daysBuf = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(ts.Days));
                 var monthsBuf = BitConverter.GetBytes(0);
 
@@ -64,7 +64,7 @@ namespace PgRvn.Server
                 monthsBuf.CopyTo(arr, sizeof(long) + sizeof(int));
 
                 return arr;
-            }, // TODO: Verify it works
+            },
         };
 
         private static byte[] Utf8GetBytes(object obj)
@@ -124,6 +124,11 @@ namespace PgRvn.Server
             pos += sizeof(int);
 
             //var ts = new TimeSpan(IPAddress.NetworkToHostOrder(BitConverter.ToInt64(buffer));
+
+
+
+            // TODO: Make this work
+
 
             return new TimeSpan();
         }
