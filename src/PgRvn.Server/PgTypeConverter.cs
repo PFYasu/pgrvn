@@ -43,10 +43,10 @@ namespace PgRvn.Server
             [(PgTypeOIDs.Bytea, PgFormat.Text)] = (obj) => (byte[])obj, // TODO: Verify it works
             [(PgTypeOIDs.Bytea, PgFormat.Binary)] = (obj) => (byte[])obj,
 
-            [(PgTypeOIDs.Timestamp, PgFormat.Text)] = Utf8GetBytes, // TODO: Verify it works
+            [(PgTypeOIDs.Timestamp, PgFormat.Text)] = (obj) => Encoding.UTF8.GetBytes(((DateTime)obj).ToString("yyyy-MM-dd HH:mm:ss.fffffff")), // TODO: Verify it works
             [(PgTypeOIDs.Timestamp, PgFormat.Binary)] = (obj) => BitConverter.GetBytes(IPAddress.HostToNetworkOrder(GetTimestamp((DateTime)obj))),
 
-            [(PgTypeOIDs.TimestampTz, PgFormat.Text)] = Utf8GetBytes, // TODO: Verify it works
+            [(PgTypeOIDs.TimestampTz, PgFormat.Text)] = (obj) => Encoding.UTF8.GetBytes(((DateTime)obj).ToString("yyyy-MM-dd HH:mm:ss.fffffffzz")), // TODO: Verify it works
             [(PgTypeOIDs.TimestampTz, PgFormat.Binary)] = (obj) => BitConverter.GetBytes(IPAddress.HostToNetworkOrder(GetTimestampTz((DateTime)obj))),
 
             [(PgTypeOIDs.Interval, PgFormat.Text)] = Utf8GetBytes, // TODO: Verify it works
