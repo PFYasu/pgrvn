@@ -41,6 +41,7 @@ namespace PgRvn.Server
 
             // Extract optional parameter types (e.g. $1::int4)
             var foundParamTypes = new List<string>();
+            // todo: add _ to supported matches (e.g. for stuff like big_int if they ever exist)
             var cleanQueryText = new Regex(@"(?<=(\$[0-9]))(::[A-Za-z0-9]+)?").Replace(message.Query, new MatchEvaluator((Match match) =>
             {
                 foundParamTypes.Add(match.Value);

@@ -34,59 +34,6 @@ namespace PgRvn.Server
             _resultColumnFormatCodes = Array.Empty<short>();
         }
 
-        private static bool IsPowerBIQuery(ref string queryText, out bool isInitialPowerBIQuery)
-        {
-            // Initial PowerBI query
-            var stmtStart = @"select * 
-from 
-(
-    from";
-
-            if (queryText.StartsWith(stmtStart))
-            {
-                queryText = "from" + queryText.Remove(0, stmtStart.Length);
-
-                var postfix = "\r\n) \"_\"\r\nlimit 0";
-                var postfixIndex = queryText.IndexOf(postfix);
-                queryText = queryText.Remove(postfixIndex);
-
-                isInitialPowerBIQuery = true;
-                return true;
-            }
-
-            // Second PowerBI query
-            if (queryText.StartsWith("select \"$Table\".\"") ||
-                queryText.StartsWith("select \"$pTable\".\""))
-            {
-                var prefix = "from \r\n(\r\n    ";
-                var prefixIndex = queryText.IndexOf(prefix);
-                var postfix = "\r\n) \"$Table\"";
-                var postfixIndex = queryText.IndexOf(postfix);
-                postfixIndex = postfixIndex == -1 ? queryText.IndexOf("\r\n) \"$pTable\"") : postfixIndex;
-                // Note: we ignore the "limit 1000" that is usually provided
-                queryText = queryText.Substring(prefixIndex + prefix.Length, postfixIndex - (prefixIndex + prefix.Length));
-
-                isInitialPowerBIQuery = false;
-                return true;
-            }
-
-            isInitialPowerBIQuery = false;
-            return false;
-        }
-
-        public static PgQuery CreateInstance(string queryText, int[] parametersDataTypes, IDocumentStore documentStore)
-        {
-            bool isInitialPowerBIQuery = false;
-            if (queryText.StartsWith("from", StringComparison.CurrentCultureIgnoreCase) ||
-                queryText.StartsWith("/*rql*/", StringComparison.CurrentCultureIgnoreCase) ||
-                IsPowerBIQuery(ref queryText, out isInitialPowerBIQuery))
-            {
-                return new RqlQuery(queryText, parametersDataTypes, documentStore, isInitialPowerBIQuery);
-            }
-
-            return new SqlQuery(queryText, parametersDataTypes);
-        }
-
         protected PgFormat GetDefaultResultsFormat()
         {
             return _resultColumnFormatCodes.Length switch
@@ -97,6 +44,23 @@ from
                     "No support for column format code count that isn't 0 or 1, got: " +
                     _resultColumnFormatCodes.Length)
             };
+        }
+
+        public static PgQuery CreateInstance(string queryText, int[] parametersDataTypes, IDocumentStore documentStore)
+        {
+            Console.WriteLine(">> Received query:\n" + queryText + "\n");
+
+            if (RqlQuery.TryParse(queryText, parametersDataTypes, documentStore, out RqlQuery rqlQuery))
+            {
+                return rqlQuery;
+            }
+
+            if (PowerBIQuery.TryParse(queryText, parametersDataTypes, documentStore, out var powerBiQuery))
+            {
+                return powerBiQuery;
+            }
+
+            return new SqlQuery(queryText, parametersDataTypes);
         }
 
         public abstract Task<ICollection<PgColumn>> Init(bool allowMultipleStatements = false);

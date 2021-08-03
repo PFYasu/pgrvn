@@ -23,14 +23,14 @@ namespace PgRvn.Server
         private QueryResult _result;
         private bool _hasId;
         private bool _hasIncludes;
-        private bool _isInitialPowerBIQuery;
+        private int? _limit;
         private Operation _operation;
 
-        public RqlQuery(string queryString, int[] parametersDataTypes, IDocumentStore documentStore, bool isInitialPowerBIQuery) : base(queryString, parametersDataTypes)
+        public RqlQuery(string queryString, int[] parametersDataTypes, IDocumentStore documentStore, int? limit = null) : base(queryString, parametersDataTypes)
         {
             _documentStore = documentStore;
             _session = documentStore.OpenAsyncSession();
-            _isInitialPowerBIQuery = isInitialPowerBIQuery;
+            _limit = limit;
         }
 
         public override async Task<ICollection<PgColumn>> Init(bool allowMultipleStatements = false)
@@ -209,6 +209,20 @@ namespace PgRvn.Server
             return Columns.Values;
         }
 
+        public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out RqlQuery rqlQuery)
+        {
+            // TODO: Use QueryParser to try and parse the query
+            if (queryText.StartsWith("from", StringComparison.CurrentCultureIgnoreCase) ||
+                queryText.StartsWith("/*rql*/", StringComparison.CurrentCultureIgnoreCase))
+            {
+                rqlQuery = new RqlQuery(queryText, parametersDataTypes, documentStore);
+                return true;
+            }
+
+            rqlQuery = null;
+            return false;
+        }
+
         // TODO: Taken from TypeConverter.cs in Raven.Server - use that when migrating
         private static unsafe bool TryConvertStringValue(string value, out object output)
         {
@@ -237,7 +251,8 @@ namespace PgRvn.Server
                 return;
             }
 
-            if (_isInitialPowerBIQuery)
+            // TODO: Handle limit != 0
+            if (_limit != null && _limit == 0)
             {
                 await writer.WriteAsync(builder.CommandComplete($"SELECT 0"), token);
                 return;
