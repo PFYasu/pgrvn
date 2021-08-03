@@ -24,6 +24,12 @@ namespace PgRvn.Server
         {
         }
 
+        // TODO: Make this the only constructor, add a TryParse method and rename this class - HardcodedQuery ? Maybe not.
+        public SqlQuery(string queryString, int[] parametersDataTypes, PgTable results) : base(queryString, parametersDataTypes)
+        {
+            _result = results;
+        }
+
         // private static PgColumnData[] Process(TSQLStatement stmt, ref int offset, out PgColumn[] columns, out int rowsOperated)
         // {
         //     // Process SELECT queryString
@@ -110,6 +116,12 @@ namespace PgRvn.Server
 
         public bool Parse(bool allowMultipleStatements)
         {
+            // TODO: Make this better, shouldn't have seperate logic for previously given result..
+            if (_result != null)
+            {
+                return true;
+            }
+
             var sqlStatements = TSQLStatementReader.ParseStatements(QueryString);
             if (allowMultipleStatements == false && sqlStatements.Count != 1)
             {
@@ -139,6 +151,24 @@ namespace PgRvn.Server
                 {
                     _result = PgConfig.PowerBIEnumTypes;
                     return true;
+                }
+
+                powerBIMatch = "select\r\n    pkcol.COLUMN_NAME as PK_COLUMN_NAME,\r\n    fkcol.TABLE_SCHEMA AS FK_TABLE_SCHEMA,\r\n    fkcol.TABLE_NAME AS FK_TABLE_NAME,\r\n    fkcol.COLUMN_NAME as FK_COLUMN_NAME,\r\n    fkcol.ORDINAL_POSITION as ORDINAL,\r\n    fkcon.CONSTRAINT_SCHEMA || '_' || fkcol.TABLE_NAME";
+                if (QueryString.StartsWith(powerBIMatch))
+                {
+                    _result = PgConfig.PowerBITableSchemaEmptyResponse;
+                }
+
+                powerBIMatch = "select\r\n    pkcol.TABLE_SCHEMA AS PK_TABLE_SCHEMA,\r\n    pkcol.TABLE_NAME AS PK_TABLE_NAME,\r\n    pkcol.COLUMN_NAME as PK_COLUMN_NAME,\r\n    fkcol.COLUMN_NAME as FK_COLUMN_NAME,\r\n    fkcol.ORDINAL_POSITION as ORDINAL,\r\n    fkcon.CONSTRAINT_SCHEMA ";
+                if (QueryString.StartsWith(powerBIMatch))
+                {
+                    _result = PgConfig.PowerBITableSchemaEmptyResponseSecondary;
+                }
+
+                powerBIMatch = "select i.CONSTRAINT_SCHEMA || '_' || i.CONSTRAINT_NAME as INDEX_NAME, ii.COLUMN_NAME, ii.ORDINAL_POSITION, case when i.CONSTRAINT_TYPE = 'PRIMARY KEY' then 'Y' else 'N' end as PRIMARY_KEY\r\nfrom INFORMATION_SCHEMA.table_constraints i inner join INFORMATION_SCHEMA.key_column_usage ii on i.CONSTRAINT_SCHEMA = ii.CONSTRAINT_SCHEMA and i.CONSTRAINT_NAME = ii.CONSTRAINT_NAME and i.TABLE_SCHEMA = ii.TABLE_SCHEMA and i.TABLE_NAME = ii.TABLE_NAME";
+                if (QueryString.StartsWith(powerBIMatch))
+                {
+                    _result = PgConfig.PowerBITableSchemaEmptyResponseTertiary;
                 }
 
                 var resultsFormat = GetDefaultResultsFormat();

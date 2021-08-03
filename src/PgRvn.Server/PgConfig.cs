@@ -55,6 +55,155 @@ namespace PgRvn.Server
             }
         };
 
+        public static readonly PgTable PowerBITableSchemaEmptyResponse = new()
+        {
+            Columns = new List<PgColumn>
+            {
+                new()
+                {
+                    Name = "pk_column_name",
+                    ColumnIndex = 0,
+                    TypeObjectId = PgTypeOIDs.Name,
+                    DataTypeSize = 64,
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "fk_table_schema",
+                    ColumnIndex = 1,
+                    TypeObjectId = PgTypeOIDs.Name,
+                    DataTypeSize = 64,
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "fk_table_name",
+                    ColumnIndex = 2,
+                    TypeObjectId = PgTypeOIDs.Name,
+                    DataTypeSize = 64,
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "fk_column_name",
+                    ColumnIndex = 3,
+                    TypeObjectId = PgTypeOIDs.Name,
+                    DataTypeSize = 64,
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "ordinal",
+                    ColumnIndex = 4,
+                    TypeObjectId = PgTypeOIDs.Int4,
+                    DataTypeSize = sizeof(int),
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "fk_name",
+                    ColumnIndex = 5,
+                    TypeObjectId = PgTypeOIDs.Name,
+                    DataTypeSize = -1,
+                    FormatCode = PgFormat.Binary
+                },
+            }
+        };
+
+        public static readonly PgTable PowerBITableSchemaEmptyResponseSecondary = new()
+        {
+            Columns = new List<PgColumn>
+            {
+                new()
+                {
+                    Name = "pk_table_schema",
+                    ColumnIndex = 0,
+                    TypeObjectId = PgTypeOIDs.Name,
+                    DataTypeSize = 64,
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "pk_table_name",
+                    ColumnIndex = 1,
+                    TypeObjectId = PgTypeOIDs.Name,
+                    DataTypeSize = 64,
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "pk_column_name",
+                    ColumnIndex = 2,
+                    TypeObjectId = PgTypeOIDs.Name,
+                    DataTypeSize = 64,
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "fk_column_name",
+                    ColumnIndex = 3,
+                    TypeObjectId = PgTypeOIDs.Name,
+                    DataTypeSize = 64,
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "ordinal",
+                    ColumnIndex = 4,
+                    TypeObjectId = PgTypeOIDs.Int4,
+                    DataTypeSize = sizeof(int),
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "fk_name",
+                    ColumnIndex = 5,
+                    TypeObjectId = PgTypeOIDs.Name,
+                    DataTypeSize = -1,
+                    FormatCode = PgFormat.Binary
+                },
+            }
+        };
+
+        public static readonly PgTable PowerBITableSchemaEmptyResponseTertiary = new()
+        {
+            Columns = new List<PgColumn>
+            {
+                new()
+                {
+                    Name = "index_name",
+                    ColumnIndex = 0,
+                    TypeObjectId = PgTypeOIDs.Text,
+                    DataTypeSize = -1,
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "column_name",
+                    ColumnIndex = 1,
+                    TypeObjectId = PgTypeOIDs.Name,
+                    DataTypeSize = 64,
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "ordinal_position",
+                    ColumnIndex = 2,
+                    TypeObjectId = PgTypeOIDs.Int4,
+                    DataTypeSize = sizeof(int),
+                    FormatCode = PgFormat.Binary
+                },
+                new()
+                {
+                    Name = "primary_key",
+                    ColumnIndex = 3,
+                    TypeObjectId = PgTypeOIDs.Text,
+                    DataTypeSize = -1,
+                    FormatCode = PgFormat.Binary
+                },
+            }
+        };
+
         public static readonly PgTable PowerBIEnumTypes = new()
         {
             Columns = new List<PgColumn>

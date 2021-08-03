@@ -20,7 +20,7 @@ namespace PgRvn.Server
         protected readonly string QueryString;
         public readonly int[] ParametersDataTypes;
         protected readonly bool IsEmptyQuery;
-        protected Dictionary<string, object> Parameters;
+        public Dictionary<string, object> Parameters;
         protected readonly Dictionary<string, PgColumn> Columns;
         private short[] _resultColumnFormatCodes;
 
@@ -50,7 +50,7 @@ namespace PgRvn.Server
         {
             Console.WriteLine(">> Received query:\n" + queryText + "\n");
 
-            if (RqlQuery.TryParse(queryText, parametersDataTypes, documentStore, out RqlQuery rqlQuery))
+            if (RqlQuery.TryParse(queryText, parametersDataTypes, documentStore, out var rqlQuery))
             {
                 return rqlQuery;
             }
@@ -69,7 +69,7 @@ namespace PgRvn.Server
 
         public abstract void Dispose();
 
-        public void Bind(IEnumerable<byte[]> parameters, short[] parameterFormatCodes, short[] resultColumnFormatCodes)
+        public virtual void Bind(IEnumerable<byte[]> parameters, short[] parameterFormatCodes, short[] resultColumnFormatCodes)
         {
             _resultColumnFormatCodes = resultColumnFormatCodes;
 
