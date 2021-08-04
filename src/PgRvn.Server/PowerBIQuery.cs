@@ -17,29 +17,26 @@ namespace PgRvn.Server
         public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out PgQuery pgQuery)
         {
             // Match RQL queries sent by PowerBI, the RQL is wrapped in an SQL statement (e.g. select * from ( from Orders ) "_" limit 0)
-            //var regexStr = @"(?i)^[ |\n|\r|\t]*(?:select[ |\n|\r|\t]+(?:.|\n|\r|\t| )*[ |\n|\r|\t]+from[ |\n|\r|\t]+\([ |\n|\r|\t]*)(?<rql>.*)[ |\n|\r|\t]*\)[ |\n|\r|\t]+""(?:\$Table|_)""[ |\n|\r|\t]+limit[ |\n|\r|\t]+(?<limit>[0-9]+)[ |\n|\r|\t]*$";
-            //var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+.*(?:\n|\r|\t| )+from(?:\n|\r|\t| )+\((?:\n|\r|\t| )*)(?<rql>.*)(?:\n|\r|\t| )*\)(?:\n|\r|\t| )+""(?:\$Table|_)""(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+)(?:\n|\r|\t| )*$";
-            //var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+(?:.|\n|\r|\t| )*(?:\n|\r|\t| )+from(?:\n|\r|\t| )+(?:(?:\((?:\n|\r|\t| )*)(?<rql>.*)(?:\n|\r|\t| )*\)|""(?<table_schema>.+)"".""(?<table_name>.+)""))(?:\n|\r|\t| )+""(?:\$Table|_)""(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+)(?:\n|\r|\t| )*$";
-            var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+(?:\*|(?:""\$Table""\.""[^""]+"" as ""[^""]+""(?:\n|\r|\t| |,)*)+)(?:\n|\r|\t| )+from(?:\n|\r|\t| )+(?:(?:\((?:\n|\r|\t| |,)*)(?<rql>.*)(?:\n|\r|\t| )*\)|""public"".""(?<table_name>.+)""))(?:\n|\r|\t| )+""(?:\$Table|_)""(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+)(?:\n|\r|\t| )*$";
+            var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+(?:\*|(?:""\$Table""\.""[^""]+"" as ""[^""]+""(?:\n|\r|\t| |,)*)+)(?:\n|\r|\t| )+from(?:\n|\r|\t| )+(?:(?:\((?:\n|\r|\t| |,)*)(?<rql>.*)(?:\n|\r|\t| )*\)|""public"".""(?<table_name>.+)""))(?:\n|\r|\t| )+""(?:\$Table|_)""(?:(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+))?(?:\n|\r|\t| )*$";
             var match = new Regex(regexStr).Match(queryText);
 
             if (match.Success)
             {
-                var limit = int.Parse(match.Groups["limit"].Value);
+                var limit = match.Groups["limit"];
                 var tableName = match.Groups["table_name"];
 
                 // If there is a table name match, its a preview query
                 if (tableName.Success)
                 {
                     // TODO: Provide these as parameters to prevent SQL injection (depends on RavenDB-17075)
-                    pgQuery = new RqlQuery($"from {tableName.Value} limit {limit}", parametersDataTypes, documentStore);
+                    pgQuery = new RqlQuery($"from {tableName.Value} {(limit.Success ? "limit " + limit.Value : "")}", parametersDataTypes, documentStore);
                     return true;
                 }
 
                 var rql = match.Groups["rql"].Value;
 
                 // TODO: Consider returning RqlQuery instead, this class might be useless if no extra state/actions needs to be handled
-                pgQuery = new RqlQuery(rql, parametersDataTypes, documentStore, limit);
+                pgQuery = new RqlQuery(rql, parametersDataTypes, documentStore, limit.Success ? int.Parse(limit.Value) : null);
                 return true;
             }
 
