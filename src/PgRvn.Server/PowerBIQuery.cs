@@ -18,13 +18,26 @@ namespace PgRvn.Server
         {
             // Match RQL queries sent by PowerBI, the RQL is wrapped in an SQL statement (e.g. select * from ( from Orders ) "_" limit 0)
             //var regexStr = @"(?i)^[ |\n|\r|\t]*(?:select[ |\n|\r|\t]+(?:.|\n|\r|\t| )*[ |\n|\r|\t]+from[ |\n|\r|\t]+\([ |\n|\r|\t]*)(?<rql>.*)[ |\n|\r|\t]*\)[ |\n|\r|\t]+""(?:\$Table|_)""[ |\n|\r|\t]+limit[ |\n|\r|\t]+(?<limit>[0-9]+)[ |\n|\r|\t]*$";
-            var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+.*(?:\n|\r|\t| )+from(?:\n|\r|\t| )+\((?:\n|\r|\t| )*)(?<rql>.*)(?:\n|\r|\t| )*\)(?:\n|\r|\t| )+""(?:\$Table|_)""(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+)(?:\n|\r|\t| )*$";
+            //var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+.*(?:\n|\r|\t| )+from(?:\n|\r|\t| )+\((?:\n|\r|\t| )*)(?<rql>.*)(?:\n|\r|\t| )*\)(?:\n|\r|\t| )+""(?:\$Table|_)""(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+)(?:\n|\r|\t| )*$";
+            var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+(?:.|\n|\r|\t| )*(?:\n|\r|\t| )+from(?:\n|\r|\t| )+(?:(?:\((?:\n|\r|\t| )*)(?<rql>.*)(?:\n|\r|\t| )*\)|""(?<table_schema>.+)"".""(?<table_name>.+)""))(?:\n|\r|\t| )+""(?:\$Table|_)""(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+)(?:\n|\r|\t| )*$";
             var match = new Regex(regexStr).Match(queryText);
 
             if (match.Success)
             {
-                var rql = match.Groups["rql"].Value;
                 var limit = int.Parse(match.Groups["limit"].Value);
+                var tableName = match.Groups["table_name"];
+
+                // If there is a table name match, its a preview query
+                if (tableName.Success)
+                {
+                    var tableSchema = match.Groups["table_schema"].Value;
+
+                    // TODO: Support limit
+                    pgQuery = new PBIPreviewQuery(parametersDataTypes, documentStore, tableSchema, tableName.Value);
+                    return true;
+                }
+
+                var rql = match.Groups["rql"].Value;
 
                 // TODO: Consider returning RqlQuery instead, this class might be useless if no extra state/actions needs to be handled
                 pgQuery = new RqlQuery(rql, parametersDataTypes, documentStore, limit);
