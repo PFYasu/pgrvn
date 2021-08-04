@@ -47,6 +47,15 @@ namespace PgRvn.Server
         public async Task RunRqlQuery()
         {
             var query = _session.Advanced.AsyncRawQuery<BlittableJsonReaderObject>(QueryString);
+            if (_limit != null)
+            {
+                // If limit is 0, fetch one document for the schema generation
+                query.Take(_limit.Value == 0 ? 1 : _limit.Value);
+            }
+
+            // TODO: Support skipping (check how/if powerbi sends it, probably using the incremental queries feature)
+            // query.Skip(..)
+
             var patchParams = new Raven.Client.Parameters();
             if (Parameters != null)
             {
@@ -251,7 +260,6 @@ namespace PgRvn.Server
                 return;
             }
 
-            // TODO: Handle limit != 0
             if (_limit != null && _limit == 0)
             {
                 await writer.WriteAsync(builder.CommandComplete($"SELECT 0"), token);

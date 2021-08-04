@@ -17,13 +17,17 @@ namespace PgRvn.Server
         public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out PgQuery pgQuery)
         {
             // Match RQL queries sent by PowerBI, the RQL is wrapped in an SQL statement (e.g. select * from ( from Orders ) "_" limit 0)
-            var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+(?:\*|(?:""\$Table""\.""[^""]+"" as ""[^""]+""(?:\n|\r|\t| |,)*)+)(?:\n|\r|\t| )+from(?:\n|\r|\t| )+(?:(?:\((?:\n|\r|\t| |,)*)(?<rql>.*)(?:\n|\r|\t| )*\)|""public"".""(?<table_name>.+)""))(?:\n|\r|\t| )+""(?:\$Table|_)""(?:(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+))?(?:\n|\r|\t| )*$";
+            var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+(?:\*|(?:(?:""(\$Table|_)""\.""(?<column>[^""]+)"" as ""[^""]+""|replace\(""_"".""(?<replace_column>[^""]+)"", '(?<replace_input>[^']+)', '(?<replace_text>[^']+)'\) as ""[^""]+"")(?:\n|\r|\t| |,)*)+)(?:\n|\r|\t| )+from(?:\n|\r|\t| )+(?:(?:\((?:\n|\r|\t| |,)*)(?<rql>(?:.|\n|\r|\t)*)(?:\n|\r|\t| )*\)|""public"".""(?<table_name>.+)""))(?:\n|\r|\t| )+""(?:\$Table|_)""(?:(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+))?(?:\n|\r|\t| )*$";
             var match = new Regex(regexStr).Match(queryText);
-
             if (match.Success)
             {
                 var limit = match.Groups["limit"];
                 var tableName = match.Groups["table_name"];
+                var rqlMatch = match.Groups["rql"];
+                var columns = match.Groups["column"];
+                var replaceColumns = match.Groups["replace_column"];
+                var replaceInputs = match.Groups["replace_input"];
+                var replaceTexts = match.Groups["replace_text"];
 
                 // If there is a table name match, its a preview query
                 if (tableName.Success)
@@ -32,12 +36,12 @@ namespace PgRvn.Server
                     pgQuery = new RqlQuery($"from {tableName.Value} {(limit.Success ? "limit " + limit.Value : "")}", parametersDataTypes, documentStore);
                     return true;
                 }
-
-                var rql = match.Groups["rql"].Value;
-
-                // TODO: Consider returning RqlQuery instead, this class might be useless if no extra state/actions needs to be handled
-                pgQuery = new RqlQuery(rql, parametersDataTypes, documentStore, limit.Success ? int.Parse(limit.Value) : null);
-                return true;
+                else if (rqlMatch.Success)
+                {
+                    // Found RQL
+                    pgQuery = new RqlQuery(rqlMatch.Value, parametersDataTypes, documentStore, limit.Success ? int.Parse(limit.Value) : null);
+                    return true;
+                }
             }
 
             // Get all collections
