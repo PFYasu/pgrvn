@@ -31,10 +31,8 @@ namespace PgRvn.Server
                 // If there is a table name match, its a preview query
                 if (tableName.Success)
                 {
-                    var tableSchema = match.Groups["table_schema"].Value;
-
-                    // TODO: Support limit
-                    pgQuery = new PBIPreviewQuery(parametersDataTypes, documentStore, tableSchema, tableName.Value);
+                    // TODO: Provide these as parameters to prevent SQL injection (depends on RavenDB-17075)
+                    pgQuery = new RqlQuery($"from {tableName.Value} limit {limit}", parametersDataTypes, documentStore);
                     return true;
                 }
 
@@ -109,15 +107,14 @@ namespace PgRvn.Server
             }
 
             // Get collection preview
-            regexStr = "(?i)^(?: |\t|\n|\r)*select(?: |\t|\n|\r)+.*(?: |\t|\n|\r)+from(?: |\t|\n|\r)+INFORMATION_SCHEMA.columns(?: |\t|\n|\r)+where(?: |\t|\n|\r)+TABLE_SCHEMA(?: |\t|\n|\r)+=(?: |\t|\n|\r)+'(?<table_schema>[^']+)'(?: |\t|\n|\r)+and(?: |\t|\n|\r)+TABLE_NAME(?: |\t|\n|\r)+=(?: |\t|\n|\r)+'(?<table_name>[^']+)'(?: |\t|\n|\r)+order(?: |\t|\n|\r)+by(?: |\t|\n|\r)+TABLE_SCHEMA(?: |\t|\n|\r)*,(?: |\t|\n|\r)*TABLE_NAME(?: |\t|\n|\r)*,(?: |\t|\n|\r)*ORDINAL_POSITION(?: |\t|\n|\r)*$";
+            regexStr = "(?i)^(?: |\t|\n|\r)*select(?: |\t|\n|\r)+.*(?: |\t|\n|\r)+from(?: |\t|\n|\r)+INFORMATION_SCHEMA.columns(?: |\t|\n|\r)+where(?: |\t|\n|\r)+TABLE_SCHEMA(?: |\t|\n|\r)+=(?: |\t|\n|\r)+'public'(?: |\t|\n|\r)+and(?: |\t|\n|\r)+TABLE_NAME(?: |\t|\n|\r)+=(?: |\t|\n|\r)+'(?<table_name>[^']+)'(?: |\t|\n|\r)+order(?: |\t|\n|\r)+by(?: |\t|\n|\r)+TABLE_SCHEMA(?: |\t|\n|\r)*,(?: |\t|\n|\r)*TABLE_NAME(?: |\t|\n|\r)*,(?: |\t|\n|\r)*ORDINAL_POSITION(?: |\t|\n|\r)*$";
             match = new Regex(regexStr).Match(queryText);
 
             if (match.Success)
             {
-                var tableSchema = match.Groups["table_schema"].Value;
                 var tableName = match.Groups["table_name"].Value;
 
-                pgQuery = new PBIPreviewQuery(parametersDataTypes, documentStore, tableSchema, tableName);
+                pgQuery = new PBIPreviewQuery(parametersDataTypes, documentStore, tableName);
                 return true;
             }
 

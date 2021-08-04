@@ -12,15 +12,13 @@ namespace PgRvn.Server
 {
     public class PBIPreviewQuery : RqlQuery
     {
-        public string _tableSchema;
         public string _tableName;
 
         private List<PgDataRow> _results;
 
-        public PBIPreviewQuery(int[] parameterDataTypes, IDocumentStore documentStore, string tableSchema, string tableName) 
+        public PBIPreviewQuery(int[] parameterDataTypes, IDocumentStore documentStore, string tableName) 
             : base($"from {tableName} limit 1", parameterDataTypes, documentStore)
         {
-            _tableSchema = tableSchema;
             _tableName = tableName;
             _results = new List<PgDataRow>();
         }
