@@ -19,7 +19,8 @@ namespace PgRvn.Server
             // Match RQL queries sent by PowerBI, the RQL is wrapped in an SQL statement (e.g. select * from ( from Orders ) "_" limit 0)
             //var regexStr = @"(?i)^[ |\n|\r|\t]*(?:select[ |\n|\r|\t]+(?:.|\n|\r|\t| )*[ |\n|\r|\t]+from[ |\n|\r|\t]+\([ |\n|\r|\t]*)(?<rql>.*)[ |\n|\r|\t]*\)[ |\n|\r|\t]+""(?:\$Table|_)""[ |\n|\r|\t]+limit[ |\n|\r|\t]+(?<limit>[0-9]+)[ |\n|\r|\t]*$";
             //var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+.*(?:\n|\r|\t| )+from(?:\n|\r|\t| )+\((?:\n|\r|\t| )*)(?<rql>.*)(?:\n|\r|\t| )*\)(?:\n|\r|\t| )+""(?:\$Table|_)""(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+)(?:\n|\r|\t| )*$";
-            var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+(?:.|\n|\r|\t| )*(?:\n|\r|\t| )+from(?:\n|\r|\t| )+(?:(?:\((?:\n|\r|\t| )*)(?<rql>.*)(?:\n|\r|\t| )*\)|""(?<table_schema>.+)"".""(?<table_name>.+)""))(?:\n|\r|\t| )+""(?:\$Table|_)""(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+)(?:\n|\r|\t| )*$";
+            //var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+(?:.|\n|\r|\t| )*(?:\n|\r|\t| )+from(?:\n|\r|\t| )+(?:(?:\((?:\n|\r|\t| )*)(?<rql>.*)(?:\n|\r|\t| )*\)|""(?<table_schema>.+)"".""(?<table_name>.+)""))(?:\n|\r|\t| )+""(?:\$Table|_)""(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+)(?:\n|\r|\t| )*$";
+            var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+(?:\*|(?:""\$Table""\.""[^""]+"" as ""[^""]+""(?:\n|\r|\t| |,)*)+)(?:\n|\r|\t| )+from(?:\n|\r|\t| )+(?:(?:\((?:\n|\r|\t| |,)*)(?<rql>.*)(?:\n|\r|\t| )*\)|""public"".""(?<table_name>.+)""))(?:\n|\r|\t| )+""(?:\$Table|_)""(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+)(?:\n|\r|\t| )*$";
             var match = new Regex(regexStr).Match(queryText);
 
             if (match.Success)
