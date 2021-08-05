@@ -60,7 +60,7 @@ namespace PgRvn.Server
             if (innerQuery.Success)
             {
                 var rql = innerQuery.Value;
-                var rqlRegexStr = @"^(?is)(?<rql>.*from\s+(?<collection>\S+)(?:\s+as\s+(?<as>\S*))?.*?(?:\s+select\s+(?<select>(?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<js_select_field_key>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<simple_select_fields>\S+),\s*)*(?<simple_select_fields>[^\s{}:=]+)))(\s.*)?)?)$";
+                var rqlRegexStr = @"^(?is)(?<rql>.*from\s+(?<collection>\S+)(?:\s+as\s+(?<as>\S*))?.*?(?:\s+select\s+(?<select>(?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<js_select_field_key>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<simple_select_fields>\S+),\s*)*(?<simple_select_fields>[^\s{}:=]+)))(\s.*)?)?(?:\s+include\s+(?<include>.*))?)$";
                 var rqlRegex = new Regex(rqlRegexStr);
                 var rqlMatch = rqlRegex.Match(rql);
 
@@ -79,12 +79,21 @@ namespace PgRvn.Server
                     // We must have an "as" clause
                     var as_clause = rqlMatch.Groups["as"];
                     var as_value = as_clause.Value;
+
+                    var as_full_value = " as x";
+                    var as_index = collection.Index + collection.Length;
                     if (!as_clause.Success)
                     {
-                        rql = rql.Insert(collection.Index + collection.Length, " as x");
+                        rql = rql.Insert(as_index, as_full_value);
                         as_value = "x";
                     }
 
+                    var where = rqlMatch.Groups["where"];
+                    
+                    // Find index in RQL where it's safe to insert the select clause
+                    var lastIndexBeforeSelect = 
+                        (where.Success ? where.Index : (int?)null) ??
+                        (as_index + as_full_value.Length);
 
                     var newSelect = "";
                     var select = match.Groups["select"];
@@ -120,9 +129,11 @@ namespace PgRvn.Server
                     {
                         newSelect = GenerateProjectionString(columns, replaceColumns, replaceInputs, replaceTexts, as_value);
                     }
+
+                    rql = rql.Insert(lastIndexBeforeSelect, $" {newSelect} ");
                 }
 
-                pgQuery = new RqlQuery(rqlMatch.Value, parametersDataTypes, documentStore, limit.Success ? int.Parse(limit.Value) : null);
+                pgQuery = new RqlQuery(rql, parametersDataTypes, documentStore, limit.Success ? int.Parse(limit.Value) : null);
                 return true;
             }
 
@@ -143,11 +154,11 @@ namespace PgRvn.Server
             }
             
             // todo: temp solution
-            var replaceColumnsSet = new HashSet<string>();
-            
-            foreach (Capture column in replaceColumns.Captures)
+            var replaceColumnsSet = new Dictionary<string, (string, string)>();
+
+            for (int i = 0; i < replaceColumns.Captures.Count; i++)
             {
-                replaceColumnsSet.Add(column.Value);
+                replaceColumnsSet.Add(replaceColumns.Captures[i].Value, (replaceInputs.Captures[i].Value, replaceTexts.Captures[i].Value));
             }
 
             var projection = "select { ";
@@ -161,27 +172,30 @@ namespace PgRvn.Server
                 }
                 else if (columnName.ToLower() == "id()")
                 {
-                    projection += $"\"{columnName}\": e[\"@metadata\"][\"@id\"]";
+                    // Nothing we can do, this is automatically generated on the Execute stage
+                    continue;
+                    //projection += $"\"{columnName}\": {as_value}[\"@metadata\"][\"@id\"]";
                 }
                 else if (columnName.ToLower() == "json()")
                 {
                     // Nothing we can do, this is automatically generated on the Execute stage
+                    continue;
                 }
                 else
                 {
                     projection += $"\"{columnName}\": {as_value}.{columnName}";
                 }
 
-                if (replaceColumnsSet.Contains(columnName))
+                if (replaceColumnsSet.TryGetValue(columnName, out var replacement))
                 {
-                    projection += $".replace({replaceInputs.Captures[i].Value}, {replaceTexts.Captures[i].Value})";
+                    projection += $".replace(\"{replacement.Item1}\", \"{replacement.Item2}\")";
                 }
 
-                if (i != columns.Captures.Count - 1)
-                {
-                    projection += ", ";
-                }
+                projection += ", ";
             }
+
+            projection = projection[0..^2];
+            projection += " }";
 
             return projection;
         }
