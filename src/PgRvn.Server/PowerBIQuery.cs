@@ -17,7 +17,9 @@ namespace PgRvn.Server
         public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out PgQuery pgQuery)
         {
             // Match RQL queries sent by PowerBI, the RQL is wrapped in an SQL statement (e.g. select * from ( from Orders ) "_" limit 0)
-            var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+(?:\*|(?:(?:""(\$Table|_)""\.""(?<column>[^""]+)"" as ""[^""]+""|replace\(""_"".""(?<replace_column>[^""]+)"", '(?<replace_input>[^']+)', '(?<replace_text>[^']+)'\) as ""[^""]+"")(?:\n|\r|\t| |,)*)+)(?:\n|\r|\t| )+from(?:\n|\r|\t| )+(?:(?:\((?:\n|\r|\t| |,)*)(?<rql>(?:.|\n|\r|\t)*)(?:\n|\r|\t| )*\)|""public"".""(?<table_name>.+)""))(?:\n|\r|\t| )+""(?:\$Table|_)""(?:(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+))?(?:\n|\r|\t| )*$";
+            //var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+(?:\*|(?:(?:""(\$Table|_)""\.""(?<column>[^""]+)"" as ""[^""]+""|replace\(""_"".""(?<replace_column>[^""]+)"", '(?<replace_input>[^']+)', '(?<replace_text>[^']+)'\) as ""[^""]+"")(?:\n|\r|\t| |,)*)+)(?:\n|\r|\t| )+from(?:\n|\r|\t| )+(?:(?:\((?:\n|\r|\t| |,)*)(?<rql>(?:.|\n|\r|\t)*from(?:\n|\r|\t| )+(?<collection>(.|\n|\r|\t)*)(?:\n|\r|\t| )+(where(?:\n|\r|\t| )+(?<where>(.|\n|\r|\t)*))?(?:\n|\r|\t| )+(select(?:\n|\r|\t| )+(?<select>.*))?(?:.|\n|\r|\t)*)(?:\n|\r|\t| )*\)|""public"".""(?<table_name>.+)""))(?:\n|\r|\t| )+""(?:\$Table|_)""(?:(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+))?(?:\n|\r|\t| )*$";
+            //var regexStr = @"(?i)^(?:\n|\r|\t| )*(?:select(?:\n|\r|\t| )+(?:\*|(?:(?:""(\$Table|_)""\.""(?<column>[^""]+)"" as ""[^""]+""|replace\(""_"".""(?<replace_column>[^""]+)"", '(?<replace_input>[^']+)', '(?<replace_text>[^']+)'\) as ""[^""]+"")(?:\n|\r|\t| |,)*)+)(?:\n|\r|\t| )+from(?:\n|\r|\t| )+(?:(?:\((?:\n|\r|\t| |,)*)(?<rql>(?:.|\n|\r|\t)*from(?:\n|\r|\t| )+(?<collection>(.|\n|\r|\t)*)(?:(?:\n|\r|\t| )+where(?:\n|\r|\t| )+(?<where>(.|\n|\r|\t)*))?(?:(?:\n|\r|\t| )+?select(?<select>\n|\r|\t|.)+)?(?:\n|\r|\t| )+(?:.|\n|\r|\t)*)(?:\n|\r|\t| )*\)|""public"".""(?<table_name>.+)""))(?:\n|\r|\t| )+""(?:\$Table|_)""(?:(?:\n|\r|\t| )+limit(?:\n|\r|\t| )+(?<limit>[0-9]+))?(?:\n|\r|\t| )*$";
+            var regexStr = @"(?is)^\s*(?:select\s+(?:\*|(?:(?:""(\$Table|_)""\.""(?<column>[^""]+)""\s+as\s+""[^""]+""|replace\(""_"".""(?<replace_column>[^""]+)"",\s+'(?<replace_input>[^']+)',\s+'(?<replace_text>[^']+)'\)\s+as\s+""[^""]+"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<rql>.*from\s+(?<collection>.*)(?:\s+where\s+(?<where>.*))?(?:\s+?select(?<select>.+))?\s+.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$";
             var match = new Regex(regexStr).Match(queryText);
             if (match.Success)
             {
@@ -39,6 +41,11 @@ namespace PgRvn.Server
                 else if (rqlMatch.Success)
                 {
                     // Found RQL
+                    var collection = match.Groups["collection"];
+                    var where = match.Groups["where"];
+                    var select = match.Groups["select"];
+
+
                     pgQuery = new RqlQuery(rqlMatch.Value, parametersDataTypes, documentStore, limit.Success ? int.Parse(limit.Value) : null);
                     return true;
                 }
@@ -108,7 +115,7 @@ namespace PgRvn.Server
             }
 
             // Get collection preview
-            regexStr = "(?i)^(?: |\t|\n|\r)*select(?: |\t|\n|\r)+.*(?: |\t|\n|\r)+from(?: |\t|\n|\r)+INFORMATION_SCHEMA.columns(?: |\t|\n|\r)+where(?: |\t|\n|\r)+TABLE_SCHEMA(?: |\t|\n|\r)+=(?: |\t|\n|\r)+'public'(?: |\t|\n|\r)+and(?: |\t|\n|\r)+TABLE_NAME(?: |\t|\n|\r)+=(?: |\t|\n|\r)+'(?<table_name>[^']+)'(?: |\t|\n|\r)+order(?: |\t|\n|\r)+by(?: |\t|\n|\r)+TABLE_SCHEMA(?: |\t|\n|\r)*,(?: |\t|\n|\r)*TABLE_NAME(?: |\t|\n|\r)*,(?: |\t|\n|\r)*ORDINAL_POSITION(?: |\t|\n|\r)*$";
+            regexStr = @"(?is) ^\s* select\s +.*\s + from\s + INFORMATION_SCHEMA.columns\s + where\s + TABLE_SCHEMA\s +=\s + 'public'\s + and\s + TABLE_NAME\s *=\s * '(?<table_name>[^']+)'\s+order\s+by\s+TABLE_SCHEMA\s*,\s*TABLE_NAME\s*,\s*ORDINAL_POSITION\s*$";
             match = new Regex(regexStr).Match(queryText);
 
             if (match.Success)
