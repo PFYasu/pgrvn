@@ -13,7 +13,7 @@ namespace PgRvn.Server
         public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out PgQuery pgQuery)
         {
             // Match queries sent by PowerBI, either RQL queries wrapped in an SQL statement OR generic SQL queries
-            var regexStr = @"(?is)^\s*(?:select\s+(?:\*|(?:(?:""(\$Table|_)""\.""(?<columns>[^""]+)""\s+as\s+""[^""]+""|replace\(""_"".""(?<replace_columns>[^""]+)"",\s+'(?<replace_inputs>[^']+)',\s+'(?<replace_texts>[^']+)'\)\s+as\s+""[^""]+"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$";
+            var regexStr = @"(?is)^\s*(?:select\s+(?:\*|(?:(?:""(\$Table|_)""\.""(?<columns>[^""]+)""\s+as\s+""[^""]+""|replace\(""_"".""(?<columns>(?<replace_columns>[^""]+))"",\s+'(?<replace_inputs>[^']+)',\s+'(?<replace_texts>[^']+)'\)\s+as\s+""[^""]+"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$";
             var match = new Regex(regexStr).Match(queryText);
 
             if (!match.Success)
@@ -57,20 +57,35 @@ namespace PgRvn.Server
             }
             
             // Handle RQL query
-            if (!innerQuery.Success)
+            if (innerQuery.Success)
             {
                 var rql = innerQuery.Value;
                 var rqlRegexStr = @"^(?is)(?<rql>.*from\s+(?<collection>\S+)(?:\s+as\s+(?<as>\S*))?.*?(?:\s+select\s+(?<select>(?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<js_select_field_key>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<simple_select_fields>\S+),\s*)*(?<simple_select_fields>[^\s{}:=]+)))(\s.*)?)?)$";
-                var rqlMatch = new Regex(rqlRegexStr).Match(rql);
+                var rqlRegex = new Regex(rqlRegexStr);
+                var rqlMatch = rqlRegex.Match(rql);
 
                 if (!rqlMatch.Success)
                 {
-                    throw new PgErrorException(PgErrorCodes.SyntaxError, "Received an RQL query with unsupported/invalid syntax.");
+                    pgQuery = null;
+                    return false;
+                    //throw new PgErrorException(PgErrorCodes.SyntaxError, "Received an RQL query with unsupported/invalid syntax.");
                 }
 
                 // No need to for projection if there's no replace columns
                 if (replaceColumns.Success)
                 {
+                    var collection = rqlMatch.Groups["collection"];
+
+                    // We must have an "as" clause
+                    var as_clause = rqlMatch.Groups["as"];
+                    var as_value = as_clause.Value;
+                    if (!as_clause.Success)
+                    {
+                        rql = rql.Insert(collection.Index + collection.Length, " as x");
+                        as_value = "x";
+                    }
+
+
                     var newSelect = "";
                     var select = match.Groups["select"];
 
@@ -103,8 +118,7 @@ namespace PgRvn.Server
                     }
                     else
                     {
-                        var as_clause = rqlMatch.Groups["as"];
-                        newSelect = GenerateProjectionString(columns, replaceColumns, replaceInputs, replaceTexts, as_clause);
+                        newSelect = GenerateProjectionString(columns, replaceColumns, replaceInputs, replaceTexts, as_value);
                     }
                 }
 
@@ -116,29 +130,57 @@ namespace PgRvn.Server
             return false;
         }
 
-        private static string GenerateProjectionString(Group columns, Group replaceColumns, Group replaceInputs, Group replaceTexts, Group as_clause)
+        private static string GenerateProjectionString(Group columns, Group replaceColumns, Group replaceInputs, Group replaceTexts, string as_value, Group selectFieldValues=null)
         {
             // TODO: if columns.Success == false throw, also for each of the other groups
 
             if (replaceColumns.Captures.Count != replaceInputs.Captures.Count &&
-                replaceColumns.Captures.Count != replaceTexts.Captures.Count)
+                replaceColumns.Captures.Count != replaceTexts.Captures.Count &&
+                (selectFieldValues != null && replaceColumns.Captures.Count != selectFieldValues.Captures.Count))
             {
+                // todo: provide these values in the error message
                 throw new PgErrorException(PgErrorCodes.StatementTooComplex, "replace(..) function in SQL statement wasn't provided the expected parameters.");
             }
-
-            var replacements = new Dictionary<string, (string, string)>();
-            for (int i = 0; i < replaceColumns.Captures.Count; i++)
+            
+            // todo: temp solution
+            var replaceColumnsSet = new HashSet<string>();
+            
+            foreach (Capture column in replaceColumns.Captures)
             {
-                replacements.Add(
-                    replaceColumns.Captures[i].Value, 
-                    (replaceInputs.Captures[i].Value, replaceTexts.Captures[i].Value));
+                replaceColumnsSet.Add(column.Value);
             }
 
             var projection = "select { ";
-            foreach (var replacement in replacements)
+            for (int i = 0; i < columns.Captures.Count; i++)
             {
-                projection += $"{replacement.Key}: {as_clause.Value}.{replacement.Key}" +
-                    $".replace({replacement.Value.Item1}, {replacement.Value.Item1})";
+                var columnName = columns.Captures[i].Value;
+
+                if (selectFieldValues != null)
+                {
+                    projection += $"\"{columnName}\": ({selectFieldValues.Captures[i].Value})";
+                }
+                else if (columnName.ToLower() == "id()")
+                {
+                    projection += $"\"{columnName}\": e[\"@metadata\"][\"@id\"]";
+                }
+                else if (columnName.ToLower() == "json()")
+                {
+                    // Nothing we can do, this is automatically generated on the Execute stage
+                }
+                else
+                {
+                    projection += $"\"{columnName}\": {as_value}.{columnName}";
+                }
+
+                if (replaceColumnsSet.Contains(columnName))
+                {
+                    projection += $".replace({replaceInputs.Captures[i].Value}, {replaceTexts.Captures[i].Value})";
+                }
+
+                if (i != columns.Captures.Count - 1)
+                {
+                    projection += ", ";
+                }
             }
 
             return projection;
