@@ -18,7 +18,7 @@ namespace PgRvn.Server
 {
     public class RqlQuery : PgQuery
     {
-        private readonly IDocumentStore _documentStore;
+        protected readonly IDocumentStore _documentStore;
         private readonly IAsyncDocumentSession _session;
         private QueryResult _result;
         private bool _hasId;

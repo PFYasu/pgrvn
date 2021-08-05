@@ -4,14 +4,9 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO.Pipelines;
-using System.Linq;
-using System.Net;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Raven.Client.Documents;
-using Raven.Client.Documents.Queries;
 
 namespace PgRvn.Server
 {
@@ -34,18 +29,6 @@ namespace PgRvn.Server
             _resultColumnFormatCodes = Array.Empty<short>();
         }
 
-        protected PgFormat GetDefaultResultsFormat()
-        {
-            return _resultColumnFormatCodes.Length switch
-            {
-                0 => PgFormat.Text,
-                1 => _resultColumnFormatCodes[0] == 0 ? PgFormat.Text : PgFormat.Binary,
-                _ => throw new NotSupportedException(
-                    "No support for column format code count that isn't 0 or 1, got: " +
-                    _resultColumnFormatCodes.Length)
-            };
-        }
-
         public static PgQuery CreateInstance(string queryText, int[] parametersDataTypes, IDocumentStore documentStore)
         {
             Console.WriteLine(">> Received query:\n" + queryText + "\n");
@@ -61,6 +44,18 @@ namespace PgRvn.Server
             }
 
             return new SqlQuery(queryText, parametersDataTypes);
+        }
+
+        protected PgFormat GetDefaultResultsFormat()
+        {
+            return _resultColumnFormatCodes.Length switch
+            {
+                0 => PgFormat.Text,
+                1 => _resultColumnFormatCodes[0] == 0 ? PgFormat.Text : PgFormat.Binary,
+                _ => throw new NotSupportedException(
+                    "No support for column format code count that isn't 0 or 1, got: " +
+                    _resultColumnFormatCodes.Length)
+            };
         }
 
         public abstract Task<ICollection<PgColumn>> Init(bool allowMultipleStatements = false);

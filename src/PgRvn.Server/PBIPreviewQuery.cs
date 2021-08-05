@@ -5,6 +5,7 @@ using System.IO.Pipelines;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,11 +17,28 @@ namespace PgRvn.Server
 
         private List<PgDataRow> _results;
 
-        public PBIPreviewQuery(int[] parameterDataTypes, IDocumentStore documentStore, string tableName) 
-            : base($"from {tableName} limit 1", parameterDataTypes, documentStore)
+        public PBIPreviewQuery(int[] parametersDataTypes, IDocumentStore documentStore, string tableName) 
+            : base($"from {tableName} limit 1", parametersDataTypes, documentStore)
         {
             _tableName = tableName;
             _results = new List<PgDataRow>();
+        }
+
+        public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out PgQuery pgQuery)
+        {
+            var regexStr = @"(?is) ^\s* select\s +.*\s + from\s + INFORMATION_SCHEMA.columns\s + where\s + TABLE_SCHEMA\s +=\s + 'public'\s + and\s + TABLE_NAME\s *=\s * '(?<table_name>[^']+)'\s+order\s+by\s+TABLE_SCHEMA\s*,\s*TABLE_NAME\s*,\s*ORDINAL_POSITION\s*$";
+            var match = new Regex(regexStr).Match(queryText);
+
+            if (match.Success)
+            {
+                var tableName = match.Groups["table_name"].Value;
+
+                pgQuery = new PBIPreviewQuery(parametersDataTypes, documentStore, tableName);
+                return true;
+            }
+
+            pgQuery = null;
+            return false;
         }
 
         public override async Task Execute(MessageBuilder builder, PipeWriter writer, CancellationToken token)
