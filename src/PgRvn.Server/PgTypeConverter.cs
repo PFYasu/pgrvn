@@ -15,7 +15,7 @@ namespace PgRvn.Server
         public delegate object FromBytesDelegate(byte[] buffer);
 
         private const long _pgTimestampOffsetTicks = 630822816000000000L;
-
+        private const int _pgTimestampTicksMultiplier = 10;
 
         public static readonly Dictionary<(int, PgFormat), ToBytesDelegate> ToBytes = new()
         {
@@ -55,7 +55,7 @@ namespace PgRvn.Server
                 var ts = (TimeSpan)obj;
                 var arr = new byte[sizeof(long) + sizeof(int) + sizeof(int)];
                 
-                var ticksBuf = BitConverter.GetBytes(IPAddress.HostToNetworkOrder((ts.Ticks - ts.Days * TimeSpan.TicksPerDay) / 10));
+                var ticksBuf = BitConverter.GetBytes(IPAddress.HostToNetworkOrder((ts.Ticks - ts.Days * TimeSpan.TicksPerDay) / _pgTimestampTicksMultiplier));
                 var daysBuf = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(ts.Days));
                 var monthsBuf = BitConverter.GetBytes(0);
 
@@ -79,7 +79,7 @@ namespace PgRvn.Server
 
         private static long GetTimestamp(DateTime timestamp)
         {
-            return (timestamp.Ticks - _pgTimestampOffsetTicks) / 10;
+            return (timestamp.Ticks - _pgTimestampOffsetTicks) / _pgTimestampTicksMultiplier;
         }
 
         private static DateTime GetTimestamp(string datetimeStr)
@@ -89,7 +89,7 @@ namespace PgRvn.Server
 
         private static long GetTimestampTz(DateTimeOffset timestamp)
         {
-            return (timestamp.Ticks - _pgTimestampOffsetTicks) / 10;
+            return (timestamp.Ticks - _pgTimestampOffsetTicks) / _pgTimestampTicksMultiplier;
         }
 
         private static DateTimeOffset GetTimestampTz(string datetimeStr)
@@ -100,12 +100,12 @@ namespace PgRvn.Server
 
         private static DateTime GetTimestamp(long timestamp)
         {
-            return new DateTime(timestamp * 10 + _pgTimestampOffsetTicks);
+            return new DateTime(timestamp * _pgTimestampTicksMultiplier + _pgTimestampOffsetTicks);
         }
 
         private static DateTime GetTimestampTz(long timestamp)
         {
-            return new DateTime(timestamp * 10 + _pgTimestampOffsetTicks, DateTimeKind.Utc);
+            return new DateTime(timestamp * _pgTimestampTicksMultiplier + _pgTimestampOffsetTicks, DateTimeKind.Utc);
         }
 
         private static object GetTimeSpan(byte[] buffer)
@@ -122,7 +122,7 @@ namespace PgRvn.Server
             var months = IPAddress.NetworkToHostOrder(MemoryMarshal.AsRef<int>(spanView[pos..]));
             pos += sizeof(int);
 
-            return new TimeSpan((ticks * 10) + (days * TimeSpan.TicksPerDay));
+            return new TimeSpan((ticks * _pgTimestampTicksMultiplier) + (days * TimeSpan.TicksPerDay));
         }
 
         public static readonly Dictionary<(int, PgFormat), FromBytesDelegate> FromBytes = new()

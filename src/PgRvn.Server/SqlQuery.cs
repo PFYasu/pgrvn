@@ -130,45 +130,45 @@ namespace PgRvn.Server
 
             foreach (var stmt in sqlStatements)
             {
-                var powerBIMatch = "\n/*** Load all supported types ***/\nSELECT ns.nspname, a.typname, a.oid, a.typrelid, a.typbasetype,\nCASE WHEN pg_proc.proname='array_recv' THEN 'a' ELSE a.typtype END AS type,\nCASE\n  WHEN pg_proc.proname='array_recv' THEN a.typelem\n  WHEN a.typtype='r' THEN rngsubtype\n  ELSE 0\nEND AS elemoid,\nCASE\n  WHEN pg_proc.proname IN ('array_recv','oidvectorrecv') THEN 3    /* Arrays last */\n  WHEN a.typtype='r' THEN 2                                        /* Ranges before */\n  WHEN a.typtype='d' THEN 1                                        /* Domains before */\n  ELSE 0                                                           /* Base types first */\nEND AS ord\nFROM pg_type AS a\nJOIN pg_namespace AS ns ON (ns.oid = a.typnamespace)\nJOIN pg_proc ON pg_proc.oid = a.typreceive\nLEFT OUTER JOIN pg_class AS cls ON (cls.oid = a.typrelid)\nLEFT OUTER JOIN pg_type AS b ON (b.oid = a.typelem)\nLEFT OUTER JOIN pg_class AS elemcls ON (elemcls.oid = b.typrelid)\nLEFT OUTER JOIN pg_range ON (pg_range.rngtypid = a.oid) \nWHERE\n  a.typtype IN ('b', 'r', 'e', 'd') OR         /* Base, range, enum, domain */\n  (a.typtype = 'c' AND cls.relkind='c') OR /* User-defined free-standing composites (not table composites) by default */\n  (pg_proc.proname='array_recv' AND (\n    b.typtype IN ('b', 'r', 'e', 'd') OR       /* Array of base, range, enum, domain */\n    (b.typtype = 'p' AND b.typname IN ('record', 'void')) OR /* Arrays of special supported pseudo-types */\n    (b.typtype = 'c' AND elemcls.relkind='c')  /* Array of user-defined free-standing composites (not table composites) */\n  )) OR\n  (a.typtype = 'p' AND a.typname IN ('record', 'void'))  /* Some special supported pseudo-types */\nORDER BY ord";
+                var powerBIMatch = PowerBIConfig.TypesQuery;
                 if (QueryString.Equals(powerBIMatch))
                 {
-                    _result = PgConfig.PowerBIInitialQueryResponse;
+                    _result = PowerBIConfig.TypesResponse;
                     return true;
                 }
 
-                powerBIMatch = "/*** Load field definitions for (free-standing) composite types ***/\nSELECT typ.oid, att.attname, att.atttypid\nFROM pg_type AS typ\nJOIN pg_namespace AS ns ON (ns.oid = typ.typnamespace)\nJOIN pg_class AS cls ON (cls.oid = typ.typrelid)\nJOIN pg_attribute AS att ON (att.attrelid = typ.typrelid)\nWHERE\n  (typ.typtype = 'c' AND cls.relkind='c') AND\n  attnum > 0 AND     /* Don't load system attributes */\n  NOT attisdropped\nORDER BY typ.oid, att.attnum";
+                powerBIMatch = PowerBIConfig.CompositeTypesQuery;
 
                 if (QueryString.Equals(powerBIMatch))
                 {
-                    _result = PgConfig.PowerBICompositeTypes;
+                    _result = PowerBIConfig.CompositeTypesResponse;
                     return true;
                 }
 
-                powerBIMatch = "/*** Load enum fields ***/\nSELECT pg_type.oid, enumlabel\nFROM pg_enum\nJOIN pg_type ON pg_type.oid=enumtypid\nORDER BY oid, enumsortorder";
+                powerBIMatch = PowerBIConfig.EnumTypesQuery;
 
                 if (QueryString.Equals(powerBIMatch))
                 {
-                    _result = PgConfig.PowerBIEnumTypes;
+                    _result = PowerBIConfig.EnumTypesResponse;
                     return true;
                 }
 
-                powerBIMatch = "select\r\n    pkcol.COLUMN_NAME as PK_COLUMN_NAME,\r\n    fkcol.TABLE_SCHEMA AS FK_TABLE_SCHEMA,\r\n    fkcol.TABLE_NAME AS FK_TABLE_NAME,\r\n    fkcol.COLUMN_NAME as FK_COLUMN_NAME,\r\n    fkcol.ORDINAL_POSITION as ORDINAL,\r\n    fkcon.CONSTRAINT_SCHEMA || '_' || fkcol.TABLE_NAME";
+                powerBIMatch = PowerBIConfig.TableSchemaQuery;
                 if (QueryString.StartsWith(powerBIMatch))
                 {
-                    _result = PgConfig.PowerBITableSchemaEmptyResponse;
+                    _result = PowerBIConfig.TableSchemaResponse;
                 }
 
-                powerBIMatch = "select\r\n    pkcol.TABLE_SCHEMA AS PK_TABLE_SCHEMA,\r\n    pkcol.TABLE_NAME AS PK_TABLE_NAME,\r\n    pkcol.COLUMN_NAME as PK_COLUMN_NAME,\r\n    fkcol.COLUMN_NAME as FK_COLUMN_NAME,\r\n    fkcol.ORDINAL_POSITION as ORDINAL,\r\n    fkcon.CONSTRAINT_SCHEMA ";
+                powerBIMatch = PowerBIConfig.TableSchemaSecondaryQuery;
                 if (QueryString.StartsWith(powerBIMatch))
                 {
-                    _result = PgConfig.PowerBITableSchemaEmptyResponseSecondary;
+                    _result = PowerBIConfig.TableSchemaSecondaryResponse;
                 }
 
-                powerBIMatch = "select i.CONSTRAINT_SCHEMA || '_' || i.CONSTRAINT_NAME as INDEX_NAME, ii.COLUMN_NAME, ii.ORDINAL_POSITION, case when i.CONSTRAINT_TYPE = 'PRIMARY KEY' then 'Y' else 'N' end as PRIMARY_KEY\r\nfrom INFORMATION_SCHEMA.table_constraints i inner join INFORMATION_SCHEMA.key_column_usage ii on i.CONSTRAINT_SCHEMA = ii.CONSTRAINT_SCHEMA and i.CONSTRAINT_NAME = ii.CONSTRAINT_NAME and i.TABLE_SCHEMA = ii.TABLE_SCHEMA and i.TABLE_NAME = ii.TABLE_NAME";
+                powerBIMatch = PowerBIConfig.ConstraintsQuery;
                 if (QueryString.StartsWith(powerBIMatch))
                 {
-                    _result = PgConfig.PowerBITableSchemaEmptyResponseTertiary;
+                    _result = PowerBIConfig.ConstraintsResponse;
                 }
 
                 var resultsFormat = GetDefaultResultsFormat();

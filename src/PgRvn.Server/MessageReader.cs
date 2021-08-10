@@ -11,13 +11,6 @@ using System.Threading.Tasks;
 
 namespace PgRvn.Server
 {
-    public enum ProtocolVersion
-    {
-        Version3 = 0x00030000,
-        TlsConnection = 80877103,
-        CancelMessage = 080877102
-    }
-
     public class MessageReader
     {
         public async Task<Message> ReadInitialMessage(PipeReader reader, CancellationToken token)
@@ -41,7 +34,7 @@ namespace PgRvn.Server
             }
 
             msgLen -= sizeof(int);
-            var clientOptions = new Dictionary<string, string>();
+            var clientOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             while (msgLen > 0)
             {
                 var (key, keyLenInBytes) = await ReadNullTerminatedString(reader, token);
@@ -53,7 +46,7 @@ namespace PgRvn.Server
                 msgLen -= valLenInBytes;
             }
 
-            if (clientOptions.TryGetValue("client_encoding", out var encoding) && encoding != "UTF8")
+            if (clientOptions.TryGetValue("client_encoding", out var encoding) && !encoding.Equals("UTF8", StringComparison.OrdinalIgnoreCase))
                 throw new PgFatalException(PgErrorCodes.FeatureNotSupported,"Only UTF8 encoding is supported, but got: " + encoding);
 
             if (clientOptions.TryGetValue("database", out _) == false)
@@ -94,24 +87,25 @@ namespace PgRvn.Server
         {
             var msgType = await ReadByteAsync(reader, token);
             var msgLen = await ReadInt32Async(reader, token) - sizeof(int);
+            int bytesRead = 0;
 
             Message message;
             switch (msgType)
             {
                 case (byte)MessageType.Parse:
-                    (message, msgLen) = await ReadParse(msgLen, reader, token);
+                    (message, bytesRead) = await ReadParse(reader, token);
                     break;
 
                 case (byte)MessageType.Bind:
-                    (message, msgLen) = await ReadBind(msgLen, reader, token);
+                    (message, bytesRead) = await ReadBind(reader, token);
                     break;
 
                 case (byte)MessageType.Describe:
-                    (message, msgLen) = await ReadDescribe(msgLen, reader, token);
+                    (message, bytesRead) = await ReadDescribe(reader, token);
                     break;
 
                 case (byte)MessageType.Execute:
-                    (message, msgLen) = await ReadExecute(msgLen, reader, token);
+                    (message, bytesRead) = await ReadExecute(reader, token);
                     break;
 
                 case (byte)MessageType.Sync:
@@ -123,10 +117,10 @@ namespace PgRvn.Server
                     break;
 
                 case (byte)MessageType.Query:
-                    (message, msgLen) = await ReadQuery(msgLen, reader, token);
+                    (message, bytesRead) = await ReadQuery(reader, token);
                     break;
                 case (byte)MessageType.Close:
-                    (message, msgLen) = await ReadClose(msgLen, reader, token);
+                    (message, bytesRead) = await ReadClose(reader, token);
                     break;
                 case (byte)MessageType.Flush:
                     message = new Flush();
@@ -136,7 +130,7 @@ namespace PgRvn.Server
                     throw new PgFatalException(PgErrorCodes.ProtocolViolation, "Message type unrecognized: " + (char)msgType);
             }
 
-            if (msgLen != 0)
+            if (msgLen != bytesRead)
             {
                 throw new PgFatalException(PgErrorCodes.ProtocolViolation,
                     $"Message is larger than specified in msgLen field, {msgLen} extra bytes in message.");
@@ -145,22 +139,24 @@ namespace PgRvn.Server
             return message;
         }
 
-        private async Task<(Parse, int)> ReadParse(int msgLen, PipeReader reader, CancellationToken token)
+        private async Task<(Parse, int)> ReadParse(PipeReader reader, CancellationToken token)
         {
+            int len = 0;
+
             var (statementName, statementLength) = await ReadNullTerminatedString(reader, token);
-            msgLen -= statementLength;
+            len += statementLength;
 
             var (query, queryLength) = await ReadNullTerminatedString(reader, token);
-            msgLen -= queryLength;
+            len += queryLength;
 
             var parametersCount = await ReadInt16Async(reader, token);
-            msgLen -= sizeof(short);
+            len += sizeof(short);
 
             var parameters = new int[parametersCount];
             for (int i = 0; i < parametersCount; i++)
             {
                 parameters[i] = await ReadInt32Async(reader, token);
-                msgLen -= sizeof(int);
+                len += sizeof(int);
             }
 
             return (new Parse
@@ -168,49 +164,51 @@ namespace PgRvn.Server
                 StatementName = statementName,
                 Query = query,
                 ParametersDataTypes = parameters
-            }, msgLen);
+            }, len);
         }
 
-        private async Task<(Bind, int)> ReadBind(int msgLen, PipeReader reader, CancellationToken token)
+        private async Task<(Bind, int)> ReadBind(PipeReader reader, CancellationToken token)
         {
+            int len = 0;
+
             var (destPortalName, destPortalLength) = await ReadNullTerminatedString(reader, token);
-            msgLen -= destPortalLength;
+            len += destPortalLength;
 
             var (preparedStatementName, preparedStatementLength) = await ReadNullTerminatedString(reader, token);
-            msgLen -= preparedStatementLength;
+            len += preparedStatementLength;
 
             var parameterFormatCodeCount = await ReadInt16Async(reader, token);
-            msgLen -= sizeof(short);
+            len += sizeof(short);
 
             var parameterCodes = new short[parameterFormatCodeCount];
             for (var i = 0; i < parameterFormatCodeCount; i++)
             {
                 parameterCodes[i] = await ReadInt16Async(reader, token);
-                msgLen -= sizeof(short);
+                len += sizeof(short);
             }
 
             var parametersCount = await ReadInt16Async(reader, token);
-            msgLen -= sizeof(short);
+            len += sizeof(short);
 
             var parameters = new List<byte[]>(parametersCount);
             for (var i = 0; i < parametersCount; i++)
             {
                 var parameterLength = await ReadInt32Async(reader, token);
-                msgLen -= sizeof(int);
+                len += sizeof(int);
 
                 // TODO: Is it okay to allocate up to 2GB of data based on external output?
                 parameters.Add(await ReadBytesAsync(reader, parameterLength, token));
-                msgLen -= parameterLength;
+                len += parameterLength;
             }
 
             var resultColumnFormatCodesCount = await ReadInt16Async(reader, token);
-            msgLen -= sizeof(short);
+            len += sizeof(short);
 
             var resultColumnFormatCodes = new short[resultColumnFormatCodesCount];
             for (var i = 0; i < resultColumnFormatCodesCount; i++)
             {
                 resultColumnFormatCodes[i] = await ReadInt16Async(reader, token);
-                msgLen -= sizeof(short);
+                len += sizeof(short);
             }
 
             return (new Bind
@@ -220,13 +218,15 @@ namespace PgRvn.Server
                 ParameterFormatCodes = parameterCodes,
                 Parameters = parameters,
                 ResultColumnFormatCodes = resultColumnFormatCodes
-            }, msgLen);
+            }, len);
         }
 
-        private async Task<(Describe, int)> ReadDescribe(int msgLen, PipeReader reader, CancellationToken token)
+        private async Task<(Describe, int)> ReadDescribe(PipeReader reader, CancellationToken token)
         {
+            int len = 0;
+
             var describeObjectType = await ReadByteAsync(reader, token);
-            msgLen -= sizeof(byte);
+            len += sizeof(byte);
 
             var pgObjectType = describeObjectType switch
             {
@@ -237,19 +237,21 @@ namespace PgRvn.Server
             };
 
             var(describedName, describedNameLength) = await ReadNullTerminatedString(reader, token);
-            msgLen -= describedNameLength;
+            len += describedNameLength;
 
             return (new Describe
             {
                 PgObjectType = pgObjectType,
                 ObjectName = describedName
-            }, msgLen);
+            }, len);
         }
 
-        private async Task<(Close, int)> ReadClose(int msgLen, PipeReader reader, CancellationToken token)
+        private async Task<(Close, int)> ReadClose(PipeReader reader, CancellationToken token)
         {
+            int len = 0;
+
             var objectType = await ReadByteAsync(reader, token);
-            msgLen -= sizeof(byte);
+            len += sizeof(byte);
 
             var pgObjectType = objectType switch
             {
@@ -260,39 +262,43 @@ namespace PgRvn.Server
             };
 
             var (objectName, objectNameLength) = await ReadNullTerminatedString(reader, token);
-            msgLen -= objectNameLength;
+            len += objectNameLength;
 
             return (new Close
             {
                 PgObjectType = pgObjectType,
                 ObjectName = objectName
-            }, msgLen);
+            }, len);
         }
 
-        private async Task<(Execute, int)> ReadExecute(int msgLen, PipeReader reader, CancellationToken token)
+        private async Task<(Execute, int)> ReadExecute(PipeReader reader, CancellationToken token)
         {
+            int len = 0;
+
             var (portalName, portalNameLength) = await ReadNullTerminatedString(reader, token);
-            msgLen -= portalNameLength;
+            len += portalNameLength;
 
             var maxRowsToReturn = await ReadInt32Async(reader, token);
-            msgLen -= sizeof(int);
+            len += sizeof(int);
 
             return (new Execute
             {
                 PortalName = portalName,
                 MaxRows = maxRowsToReturn
-            }, msgLen);
+            }, len);
         }
 
-        private async Task<(Query, int)> ReadQuery(int msgLen, PipeReader reader, CancellationToken token)
+        private async Task<(Query, int)> ReadQuery(PipeReader reader, CancellationToken token)
         {
+            int len = 0;
+
             var (queryString, queryStringLength) = await ReadNullTerminatedString(reader, token);
-            msgLen -= queryStringLength;
+            len += queryStringLength;
 
             return (new Query
             {
                 QueryString = queryString
-            }, msgLen);
+            }, len);
         }
 
         private async Task<(string String, int LengthInBytes)> ReadNullTerminatedString(PipeReader reader, CancellationToken token)
