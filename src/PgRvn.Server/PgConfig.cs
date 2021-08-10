@@ -7,19 +7,20 @@ namespace PgRvn.Server
     public static class PgConfig
     {
         // TODO: Customize these
-        public static readonly Dictionary<string, string> ParameterStatusList = new()
+        // TODO: Support changing these after startup by the user
+        public static readonly Dictionary<string, string> ParameterStatusList = new(StringComparer.OrdinalIgnoreCase)
         {
             ["client_encoding"] = "UTF8",
-            ["server_encoding"] = "UTF8",
-            ["server_version"] = "13.3",
+            ["server_encoding"] = "UTF8", // Cannot be modified after startup
+            ["server_version"] = "13.3", // Cannot be modified after startup
             ["application_name"] = "",
             ["DataStyle"] = "ISO, DMY",
-            ["integer_datetimes"] = "on",
+            ["integer_datetimes"] = "on", // Cannot be modified after startup
             ["IntervalStyle"] = "postgres",
             ["is_superuser"] = "on",
             ["session_authorization"] = "postgres",
             ["standard_conforming_strings"] = "on",
-            ["TimeZone"] = "Asia/Jerusalem",
+            ["TimeZone"] = "UTC",
         };
 
         public static byte[] TrueBuffer = { 1 }, FalseBuffer = { 0 };

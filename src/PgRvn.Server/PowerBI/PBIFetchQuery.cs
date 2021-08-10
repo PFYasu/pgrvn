@@ -10,12 +10,15 @@ namespace PgRvn.Server
 {
     public static class PBIFetchQuery
     {
+        private static readonly Regex _regex = new(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""[^""]+""(?:\s+as\s+""(?<columns>[^""]+)"")?|replace\(""_"".""(?<replace_source_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<replace_dest_columns>[^""]+)"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
+            RegexOptions.Compiled);
+        private static readonly Regex _rqlRegex = new(@"^(?is)(?<rql>.*from\s+(?<collection>\S+)(?:\s+as\s+(?<alias>\S*))?.*?(?:\s+select\s+(?<select>(?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<js_select_field_key>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<simple_select_fields>\S+),\s*)*(?<simple_select_fields>[^\s{}:=]+)))(\s.*)?)?(?:\s+include\s+(?<include>.*))?)$",
+            RegexOptions.Compiled);
+
         public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out PgQuery pgQuery)
         {
             // Match queries sent by PowerBI, either RQL queries wrapped in an SQL statement OR generic SQL queries
-            var regexStr = @"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""[^""]+""(?:\s+as\s+""(?<columns>[^""]+)"")?|replace\(""_"".""(?<replace_source_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<replace_dest_columns>[^""]+)"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$";
-            var regex = new Regex(regexStr);
-            var match = regex.Match(queryText);
+            var match = _regex.Match(queryText);
 
             if (!match.Success)
             {
@@ -64,7 +67,7 @@ namespace PgRvn.Server
                 var rql = innerQuery.Value;
 
                 // Handle double nested SQL
-                var innerMatch = regex.Match(rql);
+                var innerMatch = _regex.Match(rql);
                 if (innerMatch.Success)
                 {
                     var newInnerQuery = innerMatch.Groups["inner_query"];
@@ -74,9 +77,7 @@ namespace PgRvn.Server
                     }
                 }
 
-                var rqlRegexStr = @"^(?is)(?<rql>.*from\s+(?<collection>\S+)(?:\s+as\s+(?<as>\S*))?.*?(?:\s+select\s+(?<select>(?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<js_select_field_key>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<simple_select_fields>\S+),\s*)*(?<simple_select_fields>[^\s{}:=]+)))(\s.*)?)?(?:\s+include\s+(?<include>.*))?)$";
-                var rqlRegex = new Regex(rqlRegexStr);
-                var rqlMatch = rqlRegex.Match(rql);
+                var rqlMatch = _rqlRegex.Match(rql);
 
                 if (!rqlMatch.Success)
                 {
@@ -91,15 +92,15 @@ namespace PgRvn.Server
                     var collection = rqlMatch.Groups["collection"];
 
                     // We must have an "as" clause
-                    var as_clause = rqlMatch.Groups["as"];
-                    var as_value = as_clause.Value;
+                    var alias = rqlMatch.Groups["alias"];
+                    var aliasVal = alias.Value;
 
-                    var as_full_value = " as x";
-                    var as_index = collection.Index + collection.Length;
-                    if (!as_clause.Success)
+                    var alias_full_value = " as x";
+                    var alias_index = collection.Index + collection.Length;
+                    if (!alias.Success)
                     {
-                        rql = rql.Insert(as_index, as_full_value);
-                        as_value = "x";
+                        rql = rql.Insert(alias_index, alias_full_value);
+                        aliasVal = "x";
                     }
 
                     var where = rqlMatch.Groups["where"];
@@ -107,7 +108,7 @@ namespace PgRvn.Server
                     // Find index in RQL where it's safe to insert the select clause
                     var lastIndexBeforeSelect =
                         (where.Success ? where.Index : (int?)null) ??
-                        (as_index + as_full_value.Length);
+                        (alias_index + alias_full_value.Length);
 
                     var newSelect = "";
                     var select = match.Groups["select"];
@@ -141,7 +142,7 @@ namespace PgRvn.Server
                     }
                     else
                     {
-                        newSelect = GenerateProjectionString(columns, replaceSourceColumns, replaceDestColumns, replaceInputs, replaceTexts, as_value);
+                        newSelect = GenerateProjectionString(columns, replaceSourceColumns, replaceDestColumns, replaceInputs, replaceTexts, aliasVal);
                     }
 
                     rql = rql.Insert(lastIndexBeforeSelect, $" {newSelect} ");
@@ -156,7 +157,7 @@ namespace PgRvn.Server
             return false;
         }
 
-        private static string GenerateProjectionString(Group columns, Group replaceSourceColumns, Group replaceDestColumns, Group replaceInputs, Group replaceTexts, string as_value, Group selectFieldValues=null)
+        private static string GenerateProjectionString(Group columns, Group replaceSourceColumns, Group replaceDestColumns, Group replaceInputs, Group replaceTexts, string alias, Group selectFieldValues=null)
         {
             // TODO: if columns.Success == false throw, also for each of the other groups
 
@@ -187,7 +188,7 @@ namespace PgRvn.Server
                 if (replaceDestColumnsSet.TryGetValue(columnName, out var value))
                 {
                     var (sourceColumn, replaceInput, replaceText) = value;
-                    projection += $"\"{columnName}\": {as_value}.{sourceColumn}.toString().replace(\"{replaceInput}\", \"{replaceText}\")";
+                    projection += $"\"{columnName}\": {alias}.{sourceColumn}.toString().replace(\"{replaceInput}\", \"{replaceText}\")";
                 }
                 //else if (selectFieldValues != null) // TODO: Support this, i don't think it works as it is
                 //{
@@ -195,7 +196,7 @@ namespace PgRvn.Server
                 //}
                 else
                 {
-                    projection += $"\"{columnName}\": {as_value}.{columnName}";
+                    projection += $"\"{columnName}\": {alias}.{columnName}";
                 }
 
                 projection += ", ";

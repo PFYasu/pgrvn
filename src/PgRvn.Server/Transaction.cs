@@ -23,6 +23,8 @@ namespace PgRvn.Server
         public TransactionState State { get; private set; } = TransactionState.Idle;
         public IDocumentStore DocumentStore { get; }
         public PgQuery CurrentQuery;
+        
+        private static readonly Regex _paramRegex = new(@"(?<=(\$[0-9]))(::[A-Za-z0-9]+)?", RegexOptions.Compiled);
 
         public Transaction(IDocumentStore documentStore)
         {
@@ -42,7 +44,7 @@ namespace PgRvn.Server
             // Extract optional parameter types (e.g. $1::int4)
             var foundParamTypes = new List<string>();
             // todo: add _ to supported matches (e.g. for stuff like big_int if they ever exist)
-            var cleanQueryText = new Regex(@"(?<=(\$[0-9]))(::[A-Za-z0-9]+)?").Replace(message.Query, new MatchEvaluator((Match match) =>
+            var cleanQueryText = _paramRegex.Replace(message.Query, new MatchEvaluator((Match match) =>
             {
                 foundParamTypes.Add(match.Value);
                 return "";
@@ -75,6 +77,7 @@ namespace PgRvn.Server
             }
 
             // Change $1 to $p1 because RQL doesn't accept numeric named paramters
+            // TODO: Remove this once project is integrated into raven
             cleanQueryText = new Regex(@"(?<=\$)([0-9])").Replace(cleanQueryText, "p$0");
 
             CurrentQuery = PgQuery.CreateInstance(cleanQueryText, message.ParametersDataTypes, DocumentStore);

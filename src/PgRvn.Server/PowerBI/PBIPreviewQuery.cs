@@ -14,8 +14,9 @@ namespace PgRvn.Server
     public class PBIPreviewQuery : RqlQuery
     {
         public string _tableName;
-
         private List<PgDataRow> _results;
+        private static readonly Regex _regex = new Regex(@"(?is) ^\s* select\s +.*\s + from\s + INFORMATION_SCHEMA.columns\s + where\s + TABLE_SCHEMA\s +=\s + 'public'\s + and\s + TABLE_NAME\s *=\s * '(?<table_name>[^']+)'\s+order\s+by\s+TABLE_SCHEMA\s*,\s*TABLE_NAME\s*,\s*ORDINAL_POSITION\s*$",
+            RegexOptions.Compiled);
 
         public PBIPreviewQuery(int[] parametersDataTypes, IDocumentStore documentStore, string tableName) 
             : base($"from {tableName} limit 1", parametersDataTypes, documentStore)
@@ -26,8 +27,7 @@ namespace PgRvn.Server
 
         public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out PgQuery pgQuery)
         {
-            var regexStr = @"(?is) ^\s* select\s +.*\s + from\s + INFORMATION_SCHEMA.columns\s + where\s + TABLE_SCHEMA\s +=\s + 'public'\s + and\s + TABLE_NAME\s *=\s * '(?<table_name>[^']+)'\s+order\s+by\s+TABLE_SCHEMA\s*,\s*TABLE_NAME\s*,\s*ORDINAL_POSITION\s*$";
-            var match = new Regex(regexStr).Match(queryText);
+            var match = _regex.Match(queryText);
 
             if (match.Success)
             {
@@ -70,10 +70,10 @@ namespace PgRvn.Server
                 {
                     ColumnData = new ReadOnlyMemory<byte>?[]
                     {
-                            Encoding.UTF8.GetBytes(column.Name),
-                            BitConverter.GetBytes(IPAddress.HostToNetworkOrder(i)),
-                            Encoding.UTF8.GetBytes("YES"),
-                            Encoding.UTF8.GetBytes(""), // Note: Should be the column datatype name, but this works too
+                            Encoding.UTF8.GetBytes(column.Name), // column_name
+                            BitConverter.GetBytes(IPAddress.HostToNetworkOrder(i)), // ordinal_position
+                            Encoding.UTF8.GetBytes("YES"), // is_nullable
+                            Encoding.UTF8.GetBytes(""), // data_type - easier to leave empty for us
                     }
                 });
                 i++;
