@@ -100,16 +100,7 @@ namespace PgRvn.Server
                 sample.TryGet("@metadata", out BlittableJsonReaderObject metadata) && metadata.TryGet("@id", out string _))
             {
                 _hasId = true;
-                Columns["id()"] = new PgColumn
-                {
-                    Name = "id()",
-                    FormatCode = resultsFormat,
-                    TypeModifier = -1,
-                    TypeObjectId = PgTypeOIDs.Text,
-                    DataTypeSize = -1,
-                    ColumnIndex = 0,
-                    TableObjectId = 0
-                };
+                Columns["id()"] = new PgColumn("id()", (short)Columns.Count, PgTypeOIDs.Text, -1, resultsFormat);
             }
 
             BlittableJsonReaderObject.PropertyDetails prop = default;
@@ -165,16 +156,7 @@ namespace PgRvn.Server
                     }
                 }
 
-                Columns[prop.Name] = new PgColumn
-                {
-                    Name = prop.Name,
-                    FormatCode = resultsFormat,
-                    TypeModifier = -1,
-                    TypeObjectId = type,
-                    DataTypeSize = (short)size,
-                    ColumnIndex = (short)Columns.Count,
-                    TableObjectId = 0
-                };
+                Columns[prop.Name] = new PgColumn(prop.Name, (short)Columns.Count, type, (short)size, resultsFormat, -1);
             }
 
             //Columns["@metadata"] = new PgColumn
@@ -188,31 +170,12 @@ namespace PgRvn.Server
             //    TableObjectId = 0
             //};
 
-
-            Columns["json()"] = new PgColumn
-            {
-                Name = "json()",
-                FormatCode = resultsFormat,
-                TypeModifier = -1,
-                TypeObjectId = PgTypeOIDs.Json,
-                DataTypeSize = -1,
-                ColumnIndex = (short)Columns.Count,
-                TableObjectId = 0
-            };
+            Columns["json()"] = new PgColumn("json()", (short)Columns.Count, PgTypeOIDs.Json, -1, resultsFormat);
 
             if (_result.Includes.Count != 0)
             {
                 _hasIncludes = true;
-                Columns["is_include()"] = new PgColumn
-                {
-                    Name = "is_include()",
-                    FormatCode = resultsFormat,
-                    TypeModifier = -1,
-                    TypeObjectId = PgTypeOIDs.Bool,
-                    DataTypeSize = 1,
-                    ColumnIndex = (short)Columns.Count,
-                    TableObjectId = 0
-                };
+                Columns["is_include()"] = new PgColumn("is_include()", (short)Columns.Count, PgTypeOIDs.Bool, 1, resultsFormat);
             }
 
             return Columns.Values;

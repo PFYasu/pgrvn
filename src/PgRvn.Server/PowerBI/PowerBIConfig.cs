@@ -19,72 +19,14 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new()
-                {
-                    Name = "nspname",
-                    ColumnIndex = 0,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "typname",
-                    ColumnIndex = 1,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "oid",
-                    ColumnIndex = 2,
-                    TypeObjectId = PgTypeOIDs.Oid,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "typrelid",
-                    ColumnIndex = 3,
-                    TypeObjectId = PgTypeOIDs.Oid,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "typbasetype",
-                    ColumnIndex = 4,
-                    TypeObjectId = PgTypeOIDs.Oid,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "type",
-                    ColumnIndex = 5,
-                    TypeObjectId = PgTypeOIDs.Char,
-                    DataTypeSize = sizeof(byte),
-                    TypeModifier = 1,
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "elemoid",
-                    TableObjectId = 0,
-                    ColumnIndex = 6,
-                    TypeObjectId = PgTypeOIDs.Oid,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "ord",
-                    ColumnIndex = 7,
-                    TypeObjectId = PgTypeOIDs.Int4,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Text
-                }
+                new PgColumn("nspname", 0, PgTypeOIDs.Name, -1, PgFormat.Text),
+                new PgColumn("typname", 1, PgTypeOIDs.Name, -1, PgFormat.Text),
+                new PgColumn("oid", 2, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
+                new PgColumn("typrelid", 3, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
+                new PgColumn("typbasetype", 4, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
+                new PgColumn("type", 5, PgTypeOIDs.Char, sizeof(byte), PgFormat.Text, 1),
+                new PgColumn("elemoid", 6, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
+                new PgColumn("ord", 7, PgTypeOIDs.Int4, sizeof(int), PgFormat.Text),
             },
 
             Data = new List<PgDataRow>
@@ -2450,30 +2392,9 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new()
-                {
-                    Name = "oid",
-                    ColumnIndex = 0,
-                    TypeObjectId = PgTypeOIDs.Oid,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "attname",
-                    ColumnIndex = 1,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "atttypid",
-                    ColumnIndex = 2,
-                    TypeObjectId = PgTypeOIDs.Oid,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Text
-                },
+                new PgColumn("oid", 0, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
+                new PgColumn("attname", 1, PgTypeOIDs.Name, -1, PgFormat.Text),
+                new PgColumn("atttypid", 2, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
             }
         };
 
@@ -2481,22 +2402,8 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new()
-                {
-                    Name = "oid",
-                    ColumnIndex = 0,
-                    TypeObjectId = PgTypeOIDs.Oid,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "enumlabel",
-                    ColumnIndex = 1,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text
-                },
+                new PgColumn("oid", 0, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
+                new PgColumn("enumlabel", 1, PgTypeOIDs.Name, -1, PgFormat.Text),
             }
         };
 
@@ -2504,54 +2411,12 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new()
-                {
-                    Name = "pk_column_name",
-                    ColumnIndex = 0,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = 64,
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "fk_table_schema",
-                    ColumnIndex = 1,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = 64,
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "fk_table_name",
-                    ColumnIndex = 2,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = 64,
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "fk_column_name",
-                    ColumnIndex = 3,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = 64,
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "ordinal",
-                    ColumnIndex = 4,
-                    TypeObjectId = PgTypeOIDs.Int4,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "fk_name",
-                    ColumnIndex = 5,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Binary
-                },
+                new PgColumn("pk_column_name", 0, PgTypeOIDs.Name, 64, PgFormat.Binary),
+                new PgColumn("fk_table_schema", 1, PgTypeOIDs.Name, 64, PgFormat.Binary),
+                new PgColumn("fk_table_name", 2, PgTypeOIDs.Name, 64, PgFormat.Binary),
+                new PgColumn("fk_column_name", 3, PgTypeOIDs.Name, 64, PgFormat.Binary),
+                new PgColumn("ordinal", 4, PgTypeOIDs.Int4, sizeof(int), PgFormat.Binary),
+                new PgColumn("fk_name", 5, PgTypeOIDs.Name, -1, PgFormat.Binary),
             }
         };
 
@@ -2559,54 +2424,12 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new()
-                {
-                    Name = "pk_table_schema",
-                    ColumnIndex = 0,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = 64,
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "pk_table_name",
-                    ColumnIndex = 1,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = 64,
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "pk_column_name",
-                    ColumnIndex = 2,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = 64,
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "fk_column_name",
-                    ColumnIndex = 3,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = 64,
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "ordinal",
-                    ColumnIndex = 4,
-                    TypeObjectId = PgTypeOIDs.Int4,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "fk_name",
-                    ColumnIndex = 5,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Binary
-                },
+                new PgColumn("pk_table_schema", 0, PgTypeOIDs.Name, 64, PgFormat.Binary),
+                new PgColumn("pk_table_name", 1, PgTypeOIDs.Name, 64, PgFormat.Binary),
+                new PgColumn("pk_column_name", 2, PgTypeOIDs.Name, 64, PgFormat.Binary),
+                new PgColumn("fk_column_name", 3, PgTypeOIDs.Name, 64, PgFormat.Binary),
+                new PgColumn("ordinal", 4, PgTypeOIDs.Int4, sizeof(int), PgFormat.Binary),
+                new PgColumn("fk_name", 5, PgTypeOIDs.Name, -1, PgFormat.Binary),
             }
         };
 
@@ -2614,38 +2437,10 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new()
-                {
-                    Name = "index_name",
-                    ColumnIndex = 0,
-                    TypeObjectId = PgTypeOIDs.Text,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "column_name",
-                    ColumnIndex = 1,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = 64,
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "ordinal_position",
-                    ColumnIndex = 2,
-                    TypeObjectId = PgTypeOIDs.Int4,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "primary_key",
-                    ColumnIndex = 3,
-                    TypeObjectId = PgTypeOIDs.Text,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Binary
-                },
+                new PgColumn("index_name", 0, PgTypeOIDs.Text, -1, PgFormat.Binary),
+                new PgColumn("column_name", 1, PgTypeOIDs.Name, 64, PgFormat.Binary),
+                new PgColumn("ordinal_position", 2, PgTypeOIDs.Int4, sizeof(int), PgFormat.Binary),
+                new PgColumn("primary_key", 3, PgTypeOIDs.Text, -1, PgFormat.Binary),
             }
         };
 

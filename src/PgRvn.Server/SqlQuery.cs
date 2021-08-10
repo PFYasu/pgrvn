@@ -180,14 +180,7 @@ namespace PgRvn.Server
                     {
                         Columns = new List<PgColumn>
                         {
-                            new()
-                            {
-                                Name = "character_set_name",
-                                ColumnIndex = 0,
-                                TypeObjectId = PgTypeOIDs.Name,
-                                DataTypeSize = -1,
-                                FormatCode = resultsFormat
-                            },
+                            new PgColumn("character_set_name", 0, PgTypeOIDs.Name, -1, resultsFormat),
                         },
                         Data = new List<PgDataRow>
                         {
@@ -236,15 +229,7 @@ namespace PgRvn.Server
                     {
                         Columns = new()
                         {
-                            new PgColumn
-                            {
-                                Name = "version",
-                                ColumnIndex = 0,
-                                TypeObjectId = PgTypeOIDs.Text,
-                                DataTypeSize = -1,
-                                FormatCode = PgFormat.Text
-                    
-                            }
+                            new PgColumn("version", 0, PgTypeOIDs.Text, -1, PgFormat.Text),
                         },
                         Data = new List<PgDataRow>
                         {

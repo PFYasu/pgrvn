@@ -10,7 +10,7 @@ namespace PgRvn.Server
 {
     public static class PBIFetchQuery
     {
-        private static readonly Regex _regex = new(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""[^""]+""(?:\s+as\s+""(?<columns>[^""]+)"")?|replace\(""_"".""(?<replace_source_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<replace_dest_columns>[^""]+)"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
+        private static readonly Regex _regex = new(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""[^""]+""(?:\s+as\s+""(?<columns>[^""]+)"")?|replace\(""_"".""(?<replace_source_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<columns>(?<replace_dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
             RegexOptions.Compiled);
         private static readonly Regex _rqlRegex = new(@"^(?is)(?<rql>.*from\s+(?<collection>\S+)(?:\s+as\s+(?<alias>\S*))?.*?(?:\s+select\s+(?<select>(?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<js_select_field_key>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<simple_select_fields>\S+),\s*)*(?<simple_select_fields>[^\s{}:=]+)))(\s.*)?)?(?:\s+include\s+(?<include>.*))?)$",
             RegexOptions.Compiled);
@@ -182,8 +182,13 @@ namespace PgRvn.Server
             {
                 var columnName = columns.Captures[i].Value;
 
-                if (columnName.ToLower() == "id()") { continue; } // Nothing we can do, this is automatically generated on the Execute stage
-                if (columnName.ToLower() == "json()") { continue; }
+                // We have to project these because otherwise the order of the fields gets mixed up
+                if (columnName.Equals("id()", StringComparison.OrdinalIgnoreCase) ||
+                    columnName.Equals("json()", StringComparison.OrdinalIgnoreCase)) 
+                {
+                    projection += $"\"{columnName}\": \"\"";
+                    continue; 
+                }
 
                 if (replaceDestColumnsSet.TryGetValue(columnName, out var value))
                 {

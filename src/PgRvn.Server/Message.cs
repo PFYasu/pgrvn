@@ -74,15 +74,26 @@ namespace PgRvn.Server
         /// <summary>
         /// If the field can be identified as a column of a specific table, the object ID of the table; otherwise zero.
         /// </summary>
-        public int TableObjectId = 0;
+        public int TableObjectId;
         /// <summary>
         /// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero.
         /// </summary>
         public short ColumnIndex;
         public int TypeObjectId;
         public short DataTypeSize;
-        public int TypeModifier = -1;
+        public int TypeModifier;
         public PgFormat FormatCode;
+
+        public PgColumn(string name, short columnIndex, int typeOid, short dataTypeSize, PgFormat formatCode, int typeModifier = -1, int tableOid = 0)
+        {
+            Name = name;
+            TableObjectId = tableOid;
+            ColumnIndex = columnIndex;
+            TypeObjectId = typeOid;
+            DataTypeSize = dataTypeSize;
+            TypeModifier = typeModifier;
+            FormatCode = formatCode;
+        }
     }
 
     public class PgTable

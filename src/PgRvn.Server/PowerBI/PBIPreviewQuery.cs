@@ -81,46 +81,10 @@ namespace PgRvn.Server
 
             return new List<PgColumn>
             {
-                new PgColumn
-                {
-                    ColumnIndex = 0,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text,
-                    Name = "column_name",
-                    TableObjectId = 0,
-                    TypeModifier = -1,
-                    TypeObjectId = PgTypeOIDs.Name,
-                },
-                new PgColumn
-                {
-                    ColumnIndex = 1,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Binary, // TODO: Make sure it's the requested format
-                    Name = "ordinal_position",
-                    TableObjectId = 0,
-                    TypeModifier = -1,
-                    TypeObjectId = PgTypeOIDs.Int4,
-                },
-                new PgColumn
-                {
-                    ColumnIndex = 2,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text,
-                    Name = "is_nullable",
-                    TableObjectId = 0,
-                    TypeModifier = -1,
-                    TypeObjectId = PgTypeOIDs.Varchar,
-                },
-                new PgColumn
-                {
-                    ColumnIndex = 3,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text,
-                    Name = "data_type",
-                    TableObjectId = 0,
-                    TypeModifier = -1,
-                    TypeObjectId = PgTypeOIDs.Varchar,
-                },
+                new PgColumn("column_name", 0, PgTypeOIDs.Name, -1, PgFormat.Text),
+                new PgColumn("ordinal_position", 1, PgTypeOIDs.Int4, -1, PgFormat.Binary),
+                new PgColumn("is_nullable", 2, PgTypeOIDs.Varchar, -1, PgFormat.Text),
+                new PgColumn("data_type", 3, PgTypeOIDs.Varchar, -1, PgFormat.Text),
             };
         }
     }

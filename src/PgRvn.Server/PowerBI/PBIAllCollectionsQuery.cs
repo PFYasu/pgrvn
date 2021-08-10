@@ -35,36 +35,9 @@ namespace PgRvn.Server
         {
             return new PgColumn[]
             {
-                new PgColumn
-                {
-                    ColumnIndex = 0,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text,
-                    Name = "table_schema",
-                    TableObjectId = 0,
-                    TypeModifier = -1,
-                    TypeObjectId = PgTypeOIDs.Name,
-                },
-                new PgColumn
-                {
-                    ColumnIndex = 1,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text,
-                    Name = "table_name",
-                    TableObjectId = 0,
-                    TypeModifier = -1,
-                    TypeObjectId = PgTypeOIDs.Name,
-                },
-                new PgColumn
-                {
-                    ColumnIndex = 2,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text,
-                    Name = "table_type",
-                    TableObjectId = 0,
-                    TypeModifier = -1,
-                    TypeObjectId = PgTypeOIDs.Varchar,
-                }
+                new PgColumn("table_schema", 0, PgTypeOIDs.Name, -1, PgFormat.Text),
+                new PgColumn("table_name", 1, PgTypeOIDs.Name, -1, PgFormat.Text),
+                new PgColumn("table_type", 2, PgTypeOIDs.Varchar, -1, PgFormat.Text),
             };
         }
 
