@@ -29,116 +29,19 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new()
-                {
-                    Name = "nspname",
-                    ColumnIndex = 0,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "oid",
-                    ColumnIndex = 1,
-                    TypeObjectId = PgTypeOIDs.Oid,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Text //PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "typnamespace",
-                    ColumnIndex = 2,
-                    TypeObjectId = PgTypeOIDs.Oid,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Text //PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "typname",
-                    ColumnIndex = 3,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "typtype",
-                    ColumnIndex = 4,
-                    TypeObjectId = PgTypeOIDs.Char,
-                    DataTypeSize = sizeof(byte),
-                    TypeModifier = 1,
-                    FormatCode = PgFormat.Text //PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "typrelid",
-                    ColumnIndex = 5,
-                    TypeObjectId = PgTypeOIDs.Oid,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Text //PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "typnotnull",
-                    ColumnIndex = 6,
-                    TypeObjectId = PgTypeOIDs.Bool,
-                    DataTypeSize = sizeof(bool),
-                    FormatCode = PgFormat.Text //PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "relkind",
-                    ColumnIndex = 7,
-                    TypeObjectId = PgTypeOIDs.Char,
-                    DataTypeSize = sizeof(byte),
-                    TypeModifier = 1,
-                    FormatCode = PgFormat.Text //PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "elemtypoid",
-                    TableObjectId = 0,
-                    ColumnIndex = 8,
-                    TypeObjectId = PgTypeOIDs.Oid,
-                    DataTypeSize = sizeof(int),
-                    TypeModifier = -1,
-                    FormatCode = PgFormat.Text //PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "elemtypname",
-                    ColumnIndex = 9,
-                    TypeObjectId = PgTypeOIDs.Name,
-                    DataTypeSize = -1,
-                    FormatCode = PgFormat.Text
-                },
-                new()
-                {
-                    Name = "elemrelkind",
-                    ColumnIndex = 10,
-                    TypeObjectId = PgTypeOIDs.Char,
-                    DataTypeSize = sizeof(byte),
-                    TypeModifier = 1,
-                    FormatCode = PgFormat.Text //PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "elemtyptype",
-                    ColumnIndex = 11,
-                    TypeObjectId = PgTypeOIDs.Char,
-                    DataTypeSize = sizeof(byte),
-                    TypeModifier = 1,
-                    FormatCode = PgFormat.Text //PgFormat.Binary
-                },
-                new()
-                {
-                    Name = "ord",
-                    ColumnIndex = 12,
-                    TypeObjectId = PgTypeOIDs.Int4,
-                    DataTypeSize = sizeof(int),
-                    FormatCode = PgFormat.Text //PgFormat.Binary
-                }
+                new PgColumn("nspname", 0, PgTypeOIDs.Name, -1, PgFormat.Text),
+                new PgColumn("oid", 1, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
+                new PgColumn("typnamespace", 2, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
+                new PgColumn("typname", 3, PgTypeOIDs.Name, -1, PgFormat.Text),
+                new PgColumn("typtype", 4, PgTypeOIDs.Char, sizeof(byte), PgFormat.Text, 1),
+                new PgColumn("typrelid", 5, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
+                new PgColumn("typnotnull", 6, PgTypeOIDs.Bool, sizeof(bool), PgFormat.Text),
+                new PgColumn("relkind", 7, PgTypeOIDs.Char, sizeof(byte), PgFormat.Text, 1),
+                new PgColumn("elemtypoid", 8, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
+                new PgColumn("elemtypname", 9, PgTypeOIDs.Name, -1, PgFormat.Text),
+                new PgColumn("elemrelkind", 10, PgTypeOIDs.Char, sizeof(byte), PgFormat.Text, 1),
+                new PgColumn("elemtyptype", 11, PgTypeOIDs.Char, sizeof(byte), PgFormat.Text, 1),
+                new PgColumn("ord", 12, PgTypeOIDs.Int4, sizeof(int), PgFormat.Text),
             },
 
             Data = new List<PgDataRow>
