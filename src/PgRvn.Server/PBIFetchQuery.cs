@@ -13,7 +13,7 @@ namespace PgRvn.Server
         public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out PgQuery pgQuery)
         {
             // Match queries sent by PowerBI, either RQL queries wrapped in an SQL statement OR generic SQL queries
-            var regexStr = @"(?is)^\s*(?:select\s+(?:\*|(?:(?:""(\$Table|_)""\.""(?<columns>[^""]+)""\s+as\s+""[^""]+""|replace\(""_"".""(?<columns>(?<replace_columns>[^""]+))"",\s+'(?<replace_inputs>[^']+)',\s+'(?<replace_texts>[^']+)'\)\s+as\s+""[^""]+"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$";
+            var regexStr = @"(?is)^\s*(?:select\s+(?:\*|(?:(?:""(\$Table|_)""\.""(?<columns>[^""]+)""\s+as\s+""[^""]+""|replace\(""_"".""(?<columns>(?<replace_columns>[^""]+))"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""[^""]+"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$";
             var match = new Regex(regexStr).Match(queryText);
 
             if (!match.Success)
@@ -89,9 +89,9 @@ namespace PgRvn.Server
                     }
 
                     var where = rqlMatch.Groups["where"];
-                    
+
                     // Find index in RQL where it's safe to insert the select clause
-                    var lastIndexBeforeSelect = 
+                    var lastIndexBeforeSelect =
                         (where.Success ? where.Index : (int?)null) ??
                         (as_index + as_full_value.Length);
 
@@ -133,6 +133,8 @@ namespace PgRvn.Server
                     rql = rql.Insert(lastIndexBeforeSelect, $" {newSelect} ");
                 }
 
+                //rql = innerQuery.Value; // todo: delete this line
+                Console.WriteLine("RQL: " + rql + "\n");
                 pgQuery = new RqlQuery(rql, parametersDataTypes, documentStore, limit.Success ? int.Parse(limit.Value) : null);
                 return true;
             }
@@ -188,7 +190,7 @@ namespace PgRvn.Server
 
                 if (replaceColumnsSet.TryGetValue(columnName, out var replacement))
                 {
-                    projection += $".replace(\"{replacement.Item1}\", \"{replacement.Item2}\")";
+                    projection += $".toString().replace(\"{replacement.Item1}\", \"{replacement.Item2}\")";
                 }
 
                 projection += ", ";
