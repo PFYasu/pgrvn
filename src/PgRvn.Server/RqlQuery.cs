@@ -100,7 +100,11 @@ namespace PgRvn.Server
                 sample.TryGet("@metadata", out BlittableJsonReaderObject metadata) && metadata.TryGet("@id", out string _))
             {
                 _hasId = true;
+
+                //if (Columns.TryGetValue("id()", out var idColumn))
+                //{
                 Columns["id()"] = new PgColumn("id()", (short)Columns.Count, PgTypeOIDs.Text, -1, resultsFormat);
+                //}
             }
 
             BlittableJsonReaderObject.PropertyDetails prop = default;
@@ -170,12 +174,31 @@ namespace PgRvn.Server
             //    TableObjectId = 0
             //};
 
-            Columns["json()"] = new PgColumn("json()", (short)Columns.Count, PgTypeOIDs.Json, -1, resultsFormat);
+            if (Columns.TryGetValue("json()", out var jsonColumn))
+            {
+                jsonColumn.TypeObjectId = PgTypeOIDs.Json;
+                jsonColumn.DataTypeSize = -1;
+                jsonColumn.TypeModifier = -1;
+            }
+            else
+            {
+                Columns["json()"] = new PgColumn("json()", (short)Columns.Count, PgTypeOIDs.Json, -1, resultsFormat);
+            }
 
             if (_result.Includes.Count != 0)
             {
                 _hasIncludes = true;
-                Columns["is_include()"] = new PgColumn("is_include()", (short)Columns.Count, PgTypeOIDs.Bool, 1, resultsFormat);
+
+                if (Columns.TryGetValue("is_include()", out var includesColumn))
+                {
+                    includesColumn.TypeObjectId = PgTypeOIDs.Bool;
+                    includesColumn.DataTypeSize = 1;
+                    includesColumn.TypeModifier = -1;
+                }
+                else
+                {
+                    Columns["is_include()"] = new PgColumn("is_include()", (short)Columns.Count, PgTypeOIDs.Bool, 1, resultsFormat);
+                }
             }
 
             return Columns.Values;
@@ -247,8 +270,16 @@ namespace PgRvn.Server
             var row = ArrayPool<ReadOnlyMemory<byte>?>.Shared.Rent(Columns.Count);
             try
             {
-                var jsonIndex = _hasIncludes ? Columns.Count - 2 : Columns.Count - 1;
-                var includesIndex = Columns.Count - 1;
+                // TODO: Typically ColumnIndex represents the index in the Postgres table, but we use it here as the dictionary
+                // index which is probably not a good idea. Need to reimplement this.
+                var idIndex = Columns["id()"].ColumnIndex;
+                var jsonIndex = Columns["json()"].ColumnIndex;
+
+                var includesIndex = -1;
+                if (Columns.TryGetValue("is_include()", out var includesColumn))
+                {
+                    includesIndex = includesColumn.ColumnIndex;
+                }
 
                 foreach (BlittableJsonReaderObject result in _result.Results)
                 {
@@ -259,7 +290,7 @@ namespace PgRvn.Server
                         if (result.TryGet("@metadata", out BlittableJsonReaderObject metadata) &&
                             metadata.TryGet("@id", out string id))
                         {
-                            row[0] = Encoding.UTF8.GetBytes(id);
+                            row[idIndex] = Encoding.UTF8.GetBytes(id);
                         }
                     }
 
