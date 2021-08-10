@@ -14,7 +14,8 @@ namespace PgRvn.Server
         {
             // Match queries sent by PowerBI, either RQL queries wrapped in an SQL statement OR generic SQL queries
             var regexStr = @"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""(?<columns>[^""]+)""(?:\s+as\s+""[^""]+"")?|replace\(""_"".""(?<columns>(?<replace_columns>[^""]+))"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""[^""]+"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$";
-            var match = new Regex(regexStr).Match(queryText);
+            var regex = new Regex(regexStr);
+            var match = regex.Match(queryText);
 
             if (!match.Success)
             {
@@ -60,6 +61,18 @@ namespace PgRvn.Server
             if (innerQuery.Success)
             {
                 var rql = innerQuery.Value;
+
+                // Handle double nested SQL
+                var innerMatch = regex.Match(rql);
+                if (innerMatch.Success)
+                {
+                    var newInnerQuery = innerMatch.Groups["inner_query"];
+                    if (newInnerQuery.Success)
+                    {
+                        rql = newInnerQuery.Value;
+                    }
+                }
+
                 var rqlRegexStr = @"^(?is)(?<rql>.*from\s+(?<collection>\S+)(?:\s+as\s+(?<as>\S*))?.*?(?:\s+select\s+(?<select>(?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<js_select_field_key>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<simple_select_fields>\S+),\s*)*(?<simple_select_fields>[^\s{}:=]+)))(\s.*)?)?(?:\s+include\s+(?<include>.*))?)$";
                 var rqlRegex = new Regex(rqlRegexStr);
                 var rqlMatch = rqlRegex.Match(rql);
