@@ -116,7 +116,9 @@ namespace PgRvn.Server
 
                 var newRql = GenerateProjectedRql(rql, orderedProjectionFields);
 
-                // TODO: Support limit
+                var limit = matches[0].Groups["limit"];
+                if (limit.Success)
+                    newRql += $" limit {limit.Value} ";
 
                 pgQuery = new RqlQuery(newRql, parametersDataTypes, documentStore);
                 return true;
@@ -125,123 +127,23 @@ namespace PgRvn.Server
             {
                 // Handle generic type query
                 // TODO: handle this
+                var ma = matches[0].Groups;
+                //    // Note: We assume PowerBI never modifies the initial query for generic queries (e.g. no replace, filtering..)
+                //    // TODO: Provide these as parameters to prevent SQL injection (depends on RavenDB-17075)
+                //    var rql = $"from {tableName.Value}";
+
+                //    if (columns.Success)
+                //    {
+                //        rql += " select ";
+                //        for (int i = 0; i < columns.Captures.Count; i++)
+                //        {
+                //            rql += columns.Captures[i];
+
+                //            if (i != columns.Captures.Count - 1)
+                //                rql += ", ";
+                //        }
+                //    }
             }
-
-
-            //var limit = match.Groups["limit"];
-            //var tableName = match.Groups["table_name"];
-            //var columns = match.Groups["columns"];
-            //var replaceSourceColumns = match.Groups["replace_source_columns"];
-            //var replaceDestColumns = match.Groups["replace_dest_columns"];
-            //var replaceInputs = match.Groups["replace_inputs"];
-            //var replaceTexts = match.Groups["replace_texts"];
-
-            //// Handle generic query
-            //if (tableName.Success)
-            //{
-            //    // Note: We assume PowerBI never modifies the initial query for generic queries (e.g. no replace, filtering..)
-            //    // TODO: Provide these as parameters to prevent SQL injection (depends on RavenDB-17075)
-            //    var rql = $"from {tableName.Value}";
-
-            //    if (columns.Success)
-            //    {
-            //        rql += " select ";
-            //        for (int i = 0; i < columns.Captures.Count; i++)
-            //        {
-            //            rql += columns.Captures[i];
-
-            //            if (i != columns.Captures.Count - 1)
-            //                rql += ", ";
-            //        }
-            //    }
-
-            //    if (limit.Success)
-            //        rql += $" limit {limit.Value}";
-
-            //    pgQuery = new RqlQuery(rql, parametersDataTypes, documentStore);
-            //    return true;
-            //}
-
-            //// Handle RQL query
-            //if (innerQuery.Success)
-            //{
-            //    var rql = innerQuery.Value;
-
-            //    var rqlMatch = _rqlRegex.Match(rql);
-
-            //    if (!rqlMatch.Success)
-            //    {
-            //        pgQuery = null;
-            //        return false;
-            //        //throw new PgErrorException(PgErrorCodes.SyntaxError, "Received an RQL query with unsupported/invalid syntax.");
-            //    }
-
-            //    // No need to for projection if there's no replace columns
-            //    if (replaceSourceColumns.Success)
-            //    {
-            //        var collection = rqlMatch.Groups["collection"];
-
-            //        // We must have an "as" clause
-            //        var alias = rqlMatch.Groups["alias"];
-            //        var aliasVal = alias.Value;
-
-            //        var alias_full_value = " as x";
-            //        var alias_index = collection.Index + collection.Length;
-            //        if (!alias.Success)
-            //        {
-            //            rql = rql.Insert(alias_index, alias_full_value);
-            //            aliasVal = "x";
-            //        }
-
-            //        var where = rqlMatch.Groups["where"];
-
-            //        // Find index in RQL where it's safe to insert the select clause
-            //        var lastIndexBeforeSelect =
-            //            (where.Success ? where.Index : (int?)null) ??
-            //            (alias_index + alias_full_value.Length);
-
-            //        var newSelect = "";
-            //        var select = match.Groups["select"];
-
-            //        if (select.Success)
-            //        {
-            //            //var jsSelect = match.Groups["js_select"];
-            //            //var simpleSelect = match.Groups["simple_select"];
-            //            //var simpleSelectFields = match.Groups["simple_select_fields"];
-
-            //            //if (jsSelect.Success)
-            //            //{
-
-            //            //}
-            //            //else if (simpleSelect.Success && simpleSelectFields.Success)
-            //            //{
-            //            //    newSelect = "select ";
-
-            //            //    for (int i = 0; i < simpleSelectFields.Captures.Count; i++)
-            //            //    {
-            //            //        newSelect += simpleSelectFields.Captures[i];
-
-            //            //        if (i != simpleSelectFields.Captures.Count - 1)
-            //            //        {
-            //            //            newSelect += ", ";
-            //            //        }
-            //            //    }
-
-            //            //    var sqlWithNewRql = queryText.Replace(regex, "simpleSelect", newSelect);
-            //            //}
-            //        }
-            //        else
-            //        {
-            //            newSelect = GenerateProjectionString(columns, replaceSourceColumns, replaceDestColumns, replaceInputs, replaceTexts, aliasVal);
-            //        }
-
-            //        rql = rql.Insert(lastIndexBeforeSelect, $" {newSelect} ");
-            //    }
-
-            //    Console.WriteLine("RQL: " + rql + "\nLIMIT: " + limit.Value + "\n");
-            //    pgQuery = new RqlQuery(rql, parametersDataTypes, documentStore, limit.Success ? int.Parse(limit.Value) : null);
-            //    return true;
-            //}
 
             pgQuery = null;
             return false;
