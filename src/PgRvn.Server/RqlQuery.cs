@@ -91,26 +91,26 @@ namespace PgRvn.Server
             if (_result.Results.Length == 0)
                 return Array.Empty<PgColumn>();
 
-
             var resultsFormat = GetDefaultResultsFormat();
-
             var sample = (BlittableJsonReaderObject)_result.Results[0];
 
-            if (_result.Includes.Count > 0 ||
-                sample.TryGet("@metadata", out BlittableJsonReaderObject metadata) && metadata.TryGet("@id", out string _))
+            if (sample.TryGet("@metadata", out BlittableJsonReaderObject metadata) && metadata.TryGet("@id", out string _) ||
+                _result.Includes.Count > 0)
             {
                 _hasId = true;
-
-                //if (Columns.TryGetValue("id()", out var idColumn))
-                //{
                 Columns["id()"] = new PgColumn("id()", (short)Columns.Count, PgTypeOIDs.Text, -1, resultsFormat);
-                //}
             }
 
+            // Go over sample's columns
+            var properties = sample.GetPropertyNames();
             BlittableJsonReaderObject.PropertyDetails prop = default;
-            for (int i = 0; i < sample.Count; i++)
+            for (int i = 0; i < properties.Length; i++)
             {
-                sample.GetPropertyByIndex(i, ref prop);
+                // Using GetPropertyIndex to get the properties in the right order
+                var propIndex = sample.GetPropertyIndex(properties[i]);
+                sample.GetPropertyByIndex(propIndex, ref prop);
+
+                // Skip this column, will be added later to json() column
                 if (prop.Name == "@metadata")
                     continue;
 
@@ -160,19 +160,8 @@ namespace PgRvn.Server
                     }
                 }
 
-                Columns[prop.Name] = new PgColumn(prop.Name, (short)Columns.Count, type, (short)size, resultsFormat, -1);
+                Columns.TryAdd(prop.Name, new PgColumn(prop.Name, (short)Columns.Count, type, (short)size, resultsFormat, -1));
             }
-
-            //Columns["@metadata"] = new PgColumn
-            //{
-            //    Name = "@metadata",
-            //    FormatCode = resultsFormat,
-            //    TypeModifier = -1,
-            //    TypeObjectId = PgTypeOIDs.Text,
-            //    DataTypeSize = -1,
-            //    ColumnIndex = (short)Columns.Count,
-            //    TableObjectId = 0
-            //};
 
             if (Columns.TryGetValue("json()", out var jsonColumn))
             {
@@ -271,7 +260,7 @@ namespace PgRvn.Server
             try
             {
                 // TODO: Typically ColumnIndex represents the index in the Postgres table, but we use it here as the dictionary
-                // index which is probably not a good idea. Need to reimplement this.
+                // index which is probably not a good idea because dictionary doesn't gurantee order. Need to reimplement this.
                 var idIndex = Columns["id()"].ColumnIndex;
                 var jsonIndex = Columns["json()"].ColumnIndex;
 
@@ -298,6 +287,12 @@ namespace PgRvn.Server
 
                     foreach (var (key, pgColumn) in Columns)
                     {
+                        //if (key.Equals("id()", StringComparison.OrdinalIgnoreCase) ||
+                        //    key.Equals("json()", StringComparison.OrdinalIgnoreCase))
+                        //{
+                        //    continue;
+                        //}
+
                         var index = result.GetPropertyIndex(key);
                         if (index == -1)
                             continue;

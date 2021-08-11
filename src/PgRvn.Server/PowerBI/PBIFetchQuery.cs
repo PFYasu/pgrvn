@@ -93,6 +93,10 @@ namespace PgRvn.Server
                 // TODO: Populate another dictionary with the existing RQL select fields
                 var simpleSelectFields = rql.Groups["simple_select_fields"];
 
+                // TODO: It's incredibly important that the order of columns that is specified in the outer SQL
+                // is preserved. Right now, we start at the inner layer outwards, so most of the columns are
+                // ordered by that layer. We need to figure out how to make sure that we go by the outer layer.
+
                 // Populate the columns starting from the inner-most SQL
                 for (int i = matches.Count - 1; i >= 0; i--)
                 {
@@ -100,10 +104,10 @@ namespace PgRvn.Server
                     var columns = match.Groups["columns"].Captures;
                     foreach (Capture column in columns)
                     {
-                        if (column.Value.Equals("id()", StringComparison.OrdinalIgnoreCase) ||
-                            column.Value.Equals("json()", StringComparison.OrdinalIgnoreCase))
+                        // column.Value.Equals("json()", StringComparison.OrdinalIgnoreCase)
+                        if (column.Value.Equals("id()", StringComparison.OrdinalIgnoreCase))
                         {
-                            projectionFields.TryAdd(column.Value, "\"test\"");
+                            projectionFields.TryAdd(column.Value, $"{alias}[\"@metadata\"][\"@id\"]");
                             continue;
                         }
 
@@ -292,19 +296,6 @@ namespace PgRvn.Server
 
                 foreach (var field in projectionFields)
                 {
-                    // TODO: This fixes an issue of the id() column being null, fix it and remove this
-                    //if (field.Key.Equals("id()", StringComparison.OrdinalIgnoreCase))
-                    //{
-                    //    continue;
-                    //}
-
-                    //if (field.Key.Equals("id()", StringComparison.OrdinalIgnoreCase) ||
-                    //    field.Key.Equals("json()", StringComparison.OrdinalIgnoreCase))
-                    //{
-                    //    projection += $"\"{field.Key}\": \"\", ";
-                    //    continue;
-                    //}
-
                     projection += $"\"{field.Key}\": {field.Value}, ";
                 }
 
