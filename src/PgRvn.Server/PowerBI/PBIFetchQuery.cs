@@ -1,25 +1,17 @@
 ﻿using Raven.Client.Documents;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace PgRvn.Server
 {
     public static class PBIFetchQuery
     {
-        private static readonly Regex _regex = new(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""[^""]+""(?:\s+as\s+""(?<columns>[^""]+)"")?|replace\(""_"".""(?<replace_source_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<replace_dest_columns>[^""]+)"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
+        private static readonly Regex _regex = new(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""[^""]+""(?:\s+as\s+""(?<all_columns>(?<columns>[^""]+))"")?|replace\(""_"".""(?<replace_source_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<replace_dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
             RegexOptions.Compiled);
         private static readonly Regex _rqlRegex = new(@"^(?is)(?<rql>\s*(?:/\*rql\*/\s*)?from\s+(?<collection>[^\s\(\)]+)(?:\s+as\s+(?<alias>\S*))?.*?(?:\s+select\s+(?<select>(?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<js_select_field_key>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<simple_select_fields>\S+),\s*)*(?<simple_select_fields>[^\s{}:=]+)))(\s.*)?)?(?:\s+include\s+(?<include>.*))?)$",
             RegexOptions.Compiled);
 
-
-        private static string GetProjectionField(Capture column)
-        {
-            return "";
-        }
 
         private static void PopulateReplaceFields(Dictionary<string, string> projectionFields, Match match, string alias)
         {
@@ -93,10 +85,6 @@ namespace PgRvn.Server
                 // TODO: Populate another dictionary with the existing RQL select fields
                 var simpleSelectFields = rql.Groups["simple_select_fields"];
 
-                // TODO: It's incredibly important that the order of columns that is specified in the outer SQL
-                // is preserved. Right now, we start at the inner layer outwards, so most of the columns are
-                // ordered by that layer. We need to figure out how to make sure that we go by the outer layer.
-
                 // Populate the columns starting from the inner-most SQL
                 for (int i = matches.Count - 1; i >= 0; i--)
                 {
@@ -117,9 +105,18 @@ namespace PgRvn.Server
                     PopulateReplaceFields(projectionFields, match, alias);
                 }
 
-                var newRql = GenerateProjectedRql(rql, projectionFields);
+                // Note: It's crucial that the order of columns that is specified in the outer SQL is preserved.
+                // Create an ordered list of fields to project
+                var orderedProjectionFields = new List<(string, string)>();
+                var orderedColumns = matches[0].Groups["all_columns"].Captures;
+                foreach (Capture column in orderedColumns)
+                {
+                    orderedProjectionFields.Add((column.Value, projectionFields[column.Value]));
+                }
 
-                // TODO: Add limit
+                var newRql = GenerateProjectedRql(rql, orderedProjectionFields);
+
+                // TODO: Support limit
 
                 pgQuery = new RqlQuery(newRql, parametersDataTypes, documentStore);
                 return true;
@@ -250,7 +247,7 @@ namespace PgRvn.Server
             return false;
         }
 
-        private static string GenerateProjectedRql(Match rqlMatch, Dictionary<string, string> projectionFields)
+        private static string GenerateProjectedRql(Match rqlMatch, List<(string, string)> projectionFields)
         {
             string rql = rqlMatch.Value;
 
@@ -296,7 +293,7 @@ namespace PgRvn.Server
 
                 foreach (var field in projectionFields)
                 {
-                    projection += $"\"{field.Key}\": {field.Value}, ";
+                    projection += $"\"{field.Item1}\": {field.Item2}, ";
                 }
 
                 projection = projection[0..^2];
