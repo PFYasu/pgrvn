@@ -400,7 +400,7 @@ namespace PgRvn.Server
 
                     _result.Includes.GetPropertyByIndex(i, ref prop);
 
-                    row[0] = Encoding.UTF8.GetBytes(prop.Name);
+                    row[idIndex] = Encoding.UTF8.GetBytes(prop.Name);
                     row[jsonIndex] = Encoding.UTF8.GetBytes(prop.Value.ToString());
                     row[includesIndex] = PgConfig.TrueBuffer;
                     await writer.WriteAsync(builder.DataRow(row[..Columns.Count]), token);
