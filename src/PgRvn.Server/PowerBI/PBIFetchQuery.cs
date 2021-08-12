@@ -75,78 +75,89 @@ namespace PgRvn.Server
                 return false;
             }
 
-            if (rql.Success)
+            string newRql = null;
+            if (rql != null && rql.Success)
             {
                 // Handle RQL type query
                 var alias = rql.Groups["alias"].Success ? rql.Groups["alias"].Value : "x";
-
-                var projectionFields = new Dictionary<string, string>();
 
                 // TODO: Populate another dictionary with the existing RQL select fields
                 var simpleSelectFields = rql.Groups["simple_select_fields"];
 
                 // Populate the columns starting from the inner-most SQL
+                var projectionFields = new Dictionary<string, string>();
                 for (int i = matches.Count - 1; i >= 0; i--)
                 {
                     Match match = matches[i];
-                    var columns = match.Groups["columns"].Captures;
-                    foreach (Capture column in columns)
-                    {
-                        // column.Value.Equals("json()", StringComparison.OrdinalIgnoreCase)
-                        if (column.Value.Equals("id()", StringComparison.OrdinalIgnoreCase))
-                        {
-                            projectionFields.TryAdd(column.Value, $"{alias}[\"@metadata\"][\"@id\"]");
-                            continue;
-                        }
-
-                        projectionFields.TryAdd(column.Value, $"{alias}[\"{column.Value}\"]");
-                    }
-
-                    PopulateReplaceFields(projectionFields, match, alias);
+                    PopulateProjectionFields(match, projectionFields, alias);
                 }
 
                 // Note: It's crucial that the order of columns that is specified in the outer SQL is preserved.
-                // Create an ordered list of fields to project
-                var orderedProjectionFields = new List<(string, string)>();
-                var orderedColumns = matches[0].Groups["all_columns"].Captures;
-                foreach (Capture column in orderedColumns)
-                {
-                    orderedProjectionFields.Add((column.Value, projectionFields[column.Value]));
-                }
+                var orderedProjectionFields = GetOrderedProjectionFields(matches[0], projectionFields);
 
-                var newRql = GenerateProjectedRql(rql, orderedProjectionFields);
-
-                var limit = matches[0].Groups["limit"];
-                if (limit.Success)
-                    newRql += $" limit {limit.Value} ";
-
-                pgQuery = new RqlQuery(newRql, parametersDataTypes, documentStore);
-                return true;
+                newRql = GenerateProjectedRql(rql, orderedProjectionFields);
             }
             else if (matches[0].Groups["table_name"].Success)
             {
+                // TODO: Remove this
+                if (matches.Count != 1)
+                    throw new Exception("Too many matches, investigate."); 
+
                 // Handle generic type query
-                // TODO: handle this
-                var ma = matches[0].Groups;
-                //    // Note: We assume PowerBI never modifies the initial query for generic queries (e.g. no replace, filtering..)
-                //    // TODO: Provide these as parameters to prevent SQL injection (depends on RavenDB-17075)
-                //    var rql = $"from {tableName.Value}";
+                var alias = "x";
 
-                //    if (columns.Success)
-                //    {
-                //        rql += " select ";
-                //        for (int i = 0; i < columns.Captures.Count; i++)
-                //        {
-                //            rql += columns.Captures[i];
+                var projectionFields = new Dictionary<string, string>();
+                PopulateProjectionFields(matches[0], projectionFields, alias);
 
-                //            if (i != columns.Captures.Count - 1)
-                //                rql += ", ";
-                //        }
-                //    }
+                var orderedProjectionFields = GetOrderedProjectionFields(matches[0], projectionFields);
+
+                // TODO: Provide these as parameters to prevent SQL injection (depends on RavenDB-17075)
+                newRql = $"from {matches[0].Groups["table_name"].Value} as {alias} ";
+                newRql += GenerateProjectionString(orderedProjectionFields);
             }
 
-            pgQuery = null;
-            return false;
+            if (newRql == null)
+            {
+                pgQuery = null;
+                return false;
+            }
+
+            var limit = matches[0].Groups["limit"];
+            if (limit.Success)
+                newRql += $" limit {limit.Value} ";
+
+            pgQuery = new RqlQuery(newRql, parametersDataTypes, documentStore);
+            return true;
+        }
+
+        private static List<(string, string)> GetOrderedProjectionFields(Match match, Dictionary<string, string> projectionFields)
+        {
+            var orderedProjectionFields = new List<(string, string)>();
+            var orderedColumns = match.Groups["all_columns"].Captures;
+            foreach (Capture column in orderedColumns)
+            {
+                orderedProjectionFields.Add((column.Value, projectionFields[column.Value]));
+            }
+
+            return orderedProjectionFields;
+        }
+
+        private static void PopulateProjectionFields(Match match, Dictionary<string, string> projectionFields, string alias)
+        {
+            var columns = match.Groups["columns"].Captures;
+            foreach (Capture column in columns)
+            {
+                // column.Value.Equals("json()", StringComparison.OrdinalIgnoreCase)
+                if (column.Value.Equals("id()", StringComparison.OrdinalIgnoreCase))
+                {
+                    projectionFields.TryAdd(column.Value, $"{alias}[\"@metadata\"][\"@id\"]");
+                    continue;
+                }
+
+                projectionFields.TryAdd(column.Value, $"{alias}[\"{column.Value}\"]");
+            }
+
+            PopulateReplaceFields(projectionFields, match, alias);
         }
 
         private static string GenerateProjectedRql(Match rqlMatch, List<(string, string)> projectionFields)
@@ -191,20 +202,26 @@ namespace PgRvn.Server
                     selectIndex = where.Success ? where.Index + where.Length : aliasIndexEnd;
                 }
 
-                var projection = " select { ";
-
-                foreach (var field in projectionFields)
-                {
-                    projection += $"\"{field.Item1}\": {field.Item2}, ";
-                }
-
-                projection = projection[0..^2];
-                projection += " } ";
-
+                var projection = GenerateProjectionString(projectionFields);
                 rql = rql.Insert(selectIndex.Value, projection);
             }
 
             return rql;
+        }
+
+        private static string GenerateProjectionString(IEnumerable<(string, string)> projectionFields)
+        {
+            var projection = " select { ";
+
+            foreach (var field in projectionFields)
+            {
+                projection += $"\"{field.Item1}\": {field.Item2}, ";
+            }
+
+            projection = projection[0..^2];
+            projection += " } ";
+
+            return projection;
         }
 
         private static bool IsRql(string queryToMatch, out Match rql)
