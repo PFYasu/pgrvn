@@ -15,7 +15,7 @@ namespace PgRvn.Server
     {
         public string _tableName;
         private List<PgDataRow> _results;
-        private static readonly Regex _regex = new Regex(@"(?is) ^\s* select\s +.*\s + from\s + INFORMATION_SCHEMA.columns\s + where\s + TABLE_SCHEMA\s +=\s + 'public'\s + and\s + TABLE_NAME\s *=\s * '(?<table_name>[^']+)'\s+order\s+by\s+TABLE_SCHEMA\s*,\s*TABLE_NAME\s*,\s*ORDINAL_POSITION\s*$",
+        private static readonly Regex _regex = new Regex(@"(?is)^\s*select\s+.*\s+from\s+INFORMATION_SCHEMA.columns\s+where\s+TABLE_SCHEMA\s+=\s+'public'\s+and\s+TABLE_NAME\s*=\s*'(?<table_name>[^']+)'\s+order\s+by\s+TABLE_SCHEMA\s*,\s*TABLE_NAME\s*,\s*ORDINAL_POSITION\s*$",
             RegexOptions.Compiled);
 
         public PBIPreviewQuery(int[] parametersDataTypes, IDocumentStore documentStore, string tableName) 
