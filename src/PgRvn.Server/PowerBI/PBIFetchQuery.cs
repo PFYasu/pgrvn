@@ -7,9 +7,9 @@ namespace PgRvn.Server
 {
     public static class PBIFetchQuery
     {
-        private static readonly Regex _regex = new(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""(?<src_columns>[^""]+)""(?:\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")?(?<replace>)|(?<replace>replace)\(""_"".""(?<src_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
+        private static readonly Regex _regex = new Regex(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""(?<src_columns>[^""]+)""(?:\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")?(?<replace>)|(?<replace>replace)\(""_"".""(?<src_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
             RegexOptions.Compiled);
-        private static readonly Regex _rqlRegex = new(@"^(?is)(?<rql>\s*(?:/\*rql\*/\s*)?from\s+(?<collection>[^\s\(\)]+)(?:\s+as\s+(?<alias>\S*))?.*?(?:\s+select\s+(?<select>(?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<js_select_field_key>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<simple_select_fields>\S+),\s*)*(?<simple_select_fields>[^\s{}:=]+)))(\s.*)?)?(?:\s+include\s+(?<include>.*))?)$",
+        private static readonly Regex _rqlRegex = new Regex(@"^(?is)(?<rql>\s*(?:/\*rql\*/\s*)?from\s+(?<collection>[^\s\(\)]+)(?:\s+as\s+(?<alias>\S*))?.*?(?<select>\s+select\s+((?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<select_field_keys>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<select_field_keys>\S+),\s*)*(?<select_field_keys>[^\s{}:=]+))(\s.*)?))?(?:\s+include\s+(?<include>.*))?)$",
             RegexOptions.Compiled);
 
         private static bool TryGetMatches(string queryText, out List<Match> outMatches, out Match rql)
@@ -56,19 +56,35 @@ namespace PgRvn.Server
                 // Handle RQL type query
                 var alias = rql.Groups["alias"].Success ? rql.Groups["alias"].Value : "x";
 
-                // TODO: Populate another dictionary with the existing RQL select fields
+
+                var projectionFields = new Dictionary<string, string>();
+                bool alreadyPopulated = false;
+
                 var simpleSelectFields = rql.Groups["simple_select_fields"];
+                if (simpleSelectFields.Success)
+                {
+                    projectionFields["id()"] = GenerateColumnValue("id()", alias);
+
+                    foreach (Capture selectField in simpleSelectFields.Captures)
+                    {
+                        projectionFields[selectField.Value] = GenerateColumnValue(selectField.Value, alias);
+                    }
+
+                    projectionFields["json()"] = GenerateColumnValue("json()", alias);
+
+                    alreadyPopulated = true;
+                }
 
                 // Populate the columns starting from the inner-most SQL
-                var projectionFields = new Dictionary<string, string>();
                 for (int i = matches.Count - 1; i >= 0; i--)
                 {
                     Match match = matches[i];
-                    PopulateProjectionFields(match, projectionFields, alias);
+                    alreadyPopulated = alreadyPopulated ? alreadyPopulated : i != matches.Count - 1;
+                    PopulateProjectionFields(match, projectionFields, alias, alreadyPopulated);
                 }
 
                 // Note: It's crucial that the order of columns that is specified in the outer SQL is preserved.
-                var orderedProjectionFields = GetOrderedProjectionFields(matches[0], projectionFields);
+                var orderedProjectionFields = GetOrderedProjectionFields(matches[0], projectionFields, rql);
 
                 newRql = GenerateProjectedRql(rql, orderedProjectionFields);
             }
@@ -82,7 +98,7 @@ namespace PgRvn.Server
                 var alias = "x";
 
                 var projectionFields = new Dictionary<string, string>();
-                PopulateProjectionFields(matches[0], projectionFields, alias);
+                PopulateProjectionFields(matches[0], projectionFields, alias, false);
 
                 var orderedProjectionFields = GetOrderedProjectionFields(matches[0], projectionFields);
 
@@ -98,23 +114,46 @@ namespace PgRvn.Server
             }
 
             var limit = matches[0].Groups["limit"];
+
+            Console.WriteLine(">> RQL:\n" + newRql + "\n");
             pgQuery = new RqlQuery(newRql, parametersDataTypes, documentStore, limit.Success ? int.Parse(limit.Value) : null);
             return true;
         }
 
-        private static List<(string, string)> GetOrderedProjectionFields(Match match, Dictionary<string, string> projectionFields)
+        private static List<(string, string)> GetOrderedProjectionFields(Match match, Dictionary<string, string> projectionFields, Match rql=null)
         {
             var orderedProjectionFields = new List<(string, string)>();
+
+            // TODO: Maybe try this for every match instead of just the first
+            // Get the order from the outmost SELECT
             var orderedColumns = match.Groups["all_columns"].Captures;
+
+            // If none captured, probably got "SELECT *" so use the RQL projection order
+            if (rql != null && orderedColumns.Count == 0)
+            {
+                orderedColumns = rql.Groups["select_field_keys"].Captures;
+            }
+
             foreach (Capture column in orderedColumns)
             {
-                orderedProjectionFields.Add((column.Value, projectionFields[column.Value]));
+                if (projectionFields.TryGetValue(column.Value, out var val))
+                {
+                    orderedProjectionFields.Add((column.Value, val));
+                }
+                else
+                {
+                    orderedProjectionFields.Add((column.Value, "null"));
+                }
             }
 
             return orderedProjectionFields;
         }
 
-        private static void PopulateProjectionFields(Match match, Dictionary<string, string> projectionFields, string alias)
+        private static void PopulateProjectionFields(
+            Match match, 
+            Dictionary<string, string> projectionFields, 
+            string alias, 
+            bool alreadyPopulatedByPreviousLayer)
         {
             var destColumns = match.Groups["dest_columns"].Captures;
             var srcColumns = match.Groups["src_columns"].Captures;
@@ -128,7 +167,7 @@ namespace PgRvn.Server
                 var destColumn = destColumns[i].Value;
                 var srcColumn = srcColumns[i].Value;
 
-                string destColumnVal;
+                string destColumnVal = "";
 
                 // Try using the source column if it exists yet
                 if (projectionFields.TryGetValue(srcColumn, out string val))
@@ -137,14 +176,14 @@ namespace PgRvn.Server
                 }
                 else
                 {
-                    destColumnVal = $"{alias}[\"{destColumn}\"]";
-
-                    // TODO: Support replacing json()
-                    // TODO: Won't work on queries with include because in RqlQuery.Execute included documents' ids are put into id()
-                    if (destColumn.Equals("id()", StringComparison.OrdinalIgnoreCase))
+                    // Don't create new fields without a source when projectionFields is 
+                    // already populated from a previous SQL/RQL layer
+                    if (alreadyPopulatedByPreviousLayer)
                     {
-                        destColumnVal = $"{alias}[\"@metadata\"][\"@id\"]";
+                        continue;
                     }
+
+                    destColumnVal = GenerateColumnValue(destColumn, alias);
                 }
 
                 if (replace[i].Value.Length != 0)
@@ -158,6 +197,20 @@ namespace PgRvn.Server
             }
         }
 
+        private static string GenerateColumnValue(string column, string alias)
+        {
+            var val = $"{alias}[\"{column}\"]";
+
+            // TODO: Support replacing json()
+            // TODO: Won't work on queries with include because in RqlQuery.Execute included documents' ids are put into id()
+            if (column.Equals("id()", StringComparison.OrdinalIgnoreCase))
+            {
+                val = $"{alias}[\"@metadata\"][\"@id\"]";
+            }
+
+            return val;
+        }
+
         private static string GenerateProjectedRql(Match rqlMatch, List<(string, string)> projectionFields)
         {
             string rql = rqlMatch.Value;
@@ -165,43 +218,34 @@ namespace PgRvn.Server
             var collection = rqlMatch.Groups["collection"];
             var alias = rqlMatch.Groups["alias"];
             var where = rqlMatch.Groups["where"];
+            var select = rqlMatch.Groups["select"];
+
+            // Find index where it's safe to insert the select clause
+            int selectIndex = select.Success ? select.Index : 
+                (where.Success ? where.Index + where.Length : 
+                (alias.Success ? alias.Index + alias.Length : 
+                (collection.Index + collection.Length)));
+
+            // Remove existing select clause, must come before any inserts
+            if (select.Success)
+            {
+                rql = rql.Remove(select.Index, select.Length);
+            }
 
             // Insert an alias if doesn't exist
-            string newAliasClause = " as x";
             if (!alias.Success)
             {
+                const string newAliasClause = " as x";
                 rql = rql.Insert(collection.Index + collection.Length, newAliasClause);
-            }
 
-            // Remove existing select clauses
-            int? selectIndex = null;
-            var simpleSelect = rqlMatch.Groups["simple_select"];
-            if (simpleSelect.Success)
-            {
-                rql = rql.Remove(simpleSelect.Index, simpleSelect.Length);
-                selectIndex = simpleSelect.Index;
-            }
-
-            var jsSelect = rqlMatch.Groups["js_select"];
-            if (jsSelect.Success)
-            {
-                rql = rql.Remove(jsSelect.Index, jsSelect.Length);
-                selectIndex = jsSelect.Index;
+                selectIndex += newAliasClause.Length;
             }
 
             // Generate new select clause
             if (projectionFields.Count != 0)
             {
-                // Find select start index
-                if (selectIndex == null)
-                {
-                    // Find index where it's safe to insert the select clause
-                    var aliasIndexEnd = alias.Success ? alias.Index + alias.Length : collection.Index + collection.Length + newAliasClause.Length;
-                    selectIndex = where.Success ? where.Index + where.Length : aliasIndexEnd;
-                }
-
                 var projection = GenerateProjectionString(projectionFields);
-                rql = rql.Insert(selectIndex.Value, projection);
+                rql = rql.Insert(selectIndex, projection);
             }
 
             return rql;
