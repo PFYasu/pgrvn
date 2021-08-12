@@ -7,36 +7,10 @@ namespace PgRvn.Server
 {
     public static class PBIFetchQuery
     {
-        private static readonly Regex _regex = new(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""(?<src_columns>[^""]+)""(?:\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")?|replace\(""_"".""(?<replace_source_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<replace_dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
+        private static readonly Regex _regex = new(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""(?<src_columns>[^""]+)""(?:\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")?(?<replace>)|(?<replace>replace)\(""_"".""(?<src_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
             RegexOptions.Compiled);
         private static readonly Regex _rqlRegex = new(@"^(?is)(?<rql>\s*(?:/\*rql\*/\s*)?from\s+(?<collection>[^\s\(\)]+)(?:\s+as\s+(?<alias>\S*))?.*?(?:\s+select\s+(?<select>(?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<js_select_field_key>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<simple_select_fields>\S+),\s*)*(?<simple_select_fields>[^\s{}:=]+)))(\s.*)?)?(?:\s+include\s+(?<include>.*))?)$",
             RegexOptions.Compiled);
-
-
-        private static void PopulateReplaceFields(Dictionary<string, string> projectionFields, Match match, string alias)
-        {
-            Group replaceDestColumns = match.Groups["replace_dest_columns"];
-            Group replaceSourceColumns = match.Groups["replace_source_columns"];
-            Group replaceInputs = match.Groups["replace_inputs"];
-            Group replaceTexts = match.Groups["replace_texts"];
-
-            for (int i = 0; i < replaceDestColumns.Captures.Count; i++)
-            {
-                var destColumnName = replaceDestColumns.Captures[i].Value;
-                var srcColumnName = replaceSourceColumns.Captures[i].Value;
-                var replaceInput = replaceInputs.Captures[i].Value;
-                var replaceText = replaceTexts.Captures[i].Value;
-
-                var fieldValueStart = $"{alias}[\"{srcColumnName}\"]";
-                if (!srcColumnName.Equals(destColumnName) && projectionFields.TryGetValue(srcColumnName, out string val))
-                {
-                    fieldValueStart = $"({val})";
-                }
-
-                //projectionFields.TryAdd(destColumnName, $"{fieldValueStart}.toString().replace(\"{replaceInput}\", \"{replaceText}\")");
-                projectionFields[destColumnName] = $"{fieldValueStart}.toString().replace(\"{replaceInput}\", \"{replaceText}\")";
-            }
-        }
 
         private static bool TryGetMatches(string queryText, out List<Match> outMatches, out Match rql)
         {
@@ -144,37 +118,44 @@ namespace PgRvn.Server
         {
             var destColumns = match.Groups["dest_columns"].Captures;
             var srcColumns = match.Groups["src_columns"].Captures;
+            var replace = match.Groups["replace"].Captures;
+            var replaceInputs = match.Groups["replace_inputs"].Captures;
+            var replaceTexts = match.Groups["replace_texts"].Captures;
 
+            var replaceIndex = 0;
             for (int i = 0; i < destColumns.Count; i++)
             {
                 var destColumn = destColumns[i].Value;
                 var srcColumn = srcColumns[i].Value;
 
-                var fieldStartValue = $"{alias}[\"{destColumn}\"]";
-                if (!destColumn.Equals(srcColumn) && projectionFields.TryGetValue(srcColumn, out string val))
-                {
-                    fieldStartValue = val;
+                string destColumnVal;
 
-                    // Force the assignment in this case
-                    projectionFields[destColumn] = $"{fieldStartValue}";
+                // Try using the source column if it exists yet
+                if (projectionFields.TryGetValue(srcColumn, out string val))
+                {
+                    destColumnVal = val;
                 }
                 else
                 {
-                    // TODO: Support replacing json()
-                    // dest_column.Equals("json()", StringComparison.OrdinalIgnoreCase)
+                    destColumnVal = $"{alias}[\"{destColumn}\"]";
 
-                    // TODO: This won't work with RQLs that has include because of the logic in RqlQuery.Execute
+                    // TODO: Support replacing json()
+                    // TODO: Won't work on queries with include because in RqlQuery.Execute included documents' ids are put into id()
                     if (destColumn.Equals("id()", StringComparison.OrdinalIgnoreCase))
                     {
-                        projectionFields.TryAdd(destColumn, $"{alias}[\"@metadata\"][\"@id\"]");
-                        continue;
+                        destColumnVal = $"{alias}[\"@metadata\"][\"@id\"]";
                     }
-
-                    projectionFields.TryAdd(destColumn, $"{fieldStartValue}");
                 }
-            }
 
-            PopulateReplaceFields(projectionFields, match, alias);
+                if (replace[i].Value.Length != 0)
+                {
+                    destColumnVal = $"({destColumnVal}).toString()" +
+                        $".replace(\"{replaceInputs[replaceIndex].Value}\", \"{replaceTexts[replaceIndex].Value}\")";
+                    replaceIndex++;
+                }
+
+                projectionFields[destColumn] = destColumnVal;
+            }
         }
 
         private static string GenerateProjectedRql(Match rqlMatch, List<(string, string)> projectionFields)
