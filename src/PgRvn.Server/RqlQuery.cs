@@ -53,7 +53,7 @@ namespace PgRvn.Server
                 query.Take(_limit.Value == 0 ? 1 : _limit.Value);
             }
 
-            // TODO: Support skipping (check how/if powerbi sends it, probably using the incremental queries feature)
+            // TODO: Support skipping (check how/if powerbi sends it, probably using the incremental refresh feature)
             // query.Skip(..)
 
             var patchParams = new Raven.Client.Parameters();
