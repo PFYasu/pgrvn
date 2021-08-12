@@ -7,7 +7,7 @@ namespace PgRvn.Server
 {
     public static class PBIFetchQuery
     {
-        private static readonly Regex _regex = new(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""[^""]+""(?:\s+as\s+""(?<all_columns>(?<columns>[^""]+))"")?|replace\(""_"".""(?<replace_source_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<replace_dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
+        private static readonly Regex _regex = new(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""(?<src_columns>[^""]+)""(?:\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")?|replace\(""_"".""(?<replace_source_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<replace_dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
             RegexOptions.Compiled);
         private static readonly Regex _rqlRegex = new(@"^(?is)(?<rql>\s*(?:/\*rql\*/\s*)?from\s+(?<collection>[^\s\(\)]+)(?:\s+as\s+(?<alias>\S*))?.*?(?:\s+select\s+(?<select>(?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<js_select_field_key>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<simple_select_fields>\S+),\s*)*(?<simple_select_fields>[^\s{}:=]+)))(\s.*)?)?(?:\s+include\s+(?<include>.*))?)$",
             RegexOptions.Compiled);
@@ -33,7 +33,8 @@ namespace PgRvn.Server
                     fieldValueStart = $"({val})";
                 }
 
-                projectionFields.TryAdd(destColumnName, $"{fieldValueStart}.toString().replace(\"{replaceInput}\", \"{replaceText}\")");
+                //projectionFields.TryAdd(destColumnName, $"{fieldValueStart}.toString().replace(\"{replaceInput}\", \"{replaceText}\")");
+                projectionFields[destColumnName] = $"{fieldValueStart}.toString().replace(\"{replaceInput}\", \"{replaceText}\")";
             }
         }
 
@@ -123,10 +124,7 @@ namespace PgRvn.Server
             }
 
             var limit = matches[0].Groups["limit"];
-            if (limit.Success)
-                newRql += $" limit {limit.Value} ";
-
-            pgQuery = new RqlQuery(newRql, parametersDataTypes, documentStore);
+            pgQuery = new RqlQuery(newRql, parametersDataTypes, documentStore, limit.Success ? int.Parse(limit.Value) : null);
             return true;
         }
 
@@ -144,17 +142,36 @@ namespace PgRvn.Server
 
         private static void PopulateProjectionFields(Match match, Dictionary<string, string> projectionFields, string alias)
         {
-            var columns = match.Groups["columns"].Captures;
-            foreach (Capture column in columns)
-            {
-                // column.Value.Equals("json()", StringComparison.OrdinalIgnoreCase)
-                if (column.Value.Equals("id()", StringComparison.OrdinalIgnoreCase))
-                {
-                    projectionFields.TryAdd(column.Value, $"{alias}[\"@metadata\"][\"@id\"]");
-                    continue;
-                }
+            var destColumns = match.Groups["dest_columns"].Captures;
+            var srcColumns = match.Groups["src_columns"].Captures;
 
-                projectionFields.TryAdd(column.Value, $"{alias}[\"{column.Value}\"]");
+            for (int i = 0; i < destColumns.Count; i++)
+            {
+                var destColumn = destColumns[i].Value;
+                var srcColumn = srcColumns[i].Value;
+
+                var fieldStartValue = $"{alias}[\"{destColumn}\"]";
+                if (!destColumn.Equals(srcColumn) && projectionFields.TryGetValue(srcColumn, out string val))
+                {
+                    fieldStartValue = val;
+
+                    // Force the assignment in this case
+                    projectionFields[destColumn] = $"{fieldStartValue}";
+                }
+                else
+                {
+                    // TODO: Support replacing json()
+                    // dest_column.Equals("json()", StringComparison.OrdinalIgnoreCase)
+
+                    // TODO: This won't work with RQLs that has include because of the logic in RqlQuery.Execute
+                    if (destColumn.Equals("id()", StringComparison.OrdinalIgnoreCase))
+                    {
+                        projectionFields.TryAdd(destColumn, $"{alias}[\"@metadata\"][\"@id\"]");
+                        continue;
+                    }
+
+                    projectionFields.TryAdd(destColumn, $"{fieldStartValue}");
+                }
             }
 
             PopulateReplaceFields(projectionFields, match, alias);

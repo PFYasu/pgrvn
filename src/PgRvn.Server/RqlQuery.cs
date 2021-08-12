@@ -235,7 +235,7 @@ namespace PgRvn.Server
                 return;
             }
 
-            if (_limit != null && _limit == 0)
+            if (_limit == 0)
             {
                 await writer.WriteAsync(builder.CommandComplete($"SELECT 0"), token);
                 return;
