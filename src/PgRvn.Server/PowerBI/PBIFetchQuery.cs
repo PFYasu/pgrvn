@@ -9,7 +9,7 @@ namespace PgRvn.Server
     {
         private static readonly Regex _regex = new Regex(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""(?<src_columns>[^""]+)""(?:\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")?(?<replace>)|(?<replace>replace)\(""_"".""(?<src_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
             RegexOptions.Compiled);
-        private static readonly Regex _rqlRegex = new Regex(@"^(?is)(?<rql>\s*(?:/\*rql\*/\s*)?from\s+(?<collection>[^\s\(\)]+)(?:\s+as\s+(?<alias>\S*))?.*?(?<select>\s+select\s+((?<js_select>{\s*(?<js_select_inside>(?<js_select_field>(?<select_field_keys>\S+\s*)(?::\s*(?<js_select_field_value>\S+))?\s*,\s*)*(?<js_select_field>(?<js_select_field_key>\S+\s*):\s*(?<js_select_field_value>\S+)\s*))?\s*})|(?<simple_select>((?<select_field_keys>\S+),\s*)*(?<select_field_keys>[^\s{}:=]+))(\s.*)?))?(?:\s+include\s+(?<include>.*))?)$",
+        private static readonly Regex _rqlRegex = new Regex(@"^(?is)\s*(?<rql>(?:/\*rql\*/\s*)?from\s+(?<collection>[^\s\(\)]+)(?:\s+as\s+(?<alias>\S+))?.*?(?<select>\s+select\s+((?<js_select>({\s*(?<js_fields>(?<js_keys>.+?)(\s*:\s*((?<js_vals>.+?))|(?<js_vals>))\s*,\s*)*(?<js_fields>(?<js_keys>.+?)((\s*:\s*(?<js_vals>.+?))|(?<js_vals>))\s*)}))|(?<simple_select>((?<simple_keys>.+?)\s*,\s*)*(((?<simple_keys>\S+)|(?<simple_keys>"".* ""))(\s*as\s*(\S+|"".* "")\s*)?))))?(?:\s+include\s+(?<include>.*))?\s*)$",
             RegexOptions.Compiled);
 
         private static bool TryGetMatches(string queryText, out List<Match> outMatches, out Match rql)
@@ -60,14 +60,44 @@ namespace PgRvn.Server
                 var projectionFields = new Dictionary<string, string>();
                 bool alreadyPopulated = false;
 
-                var simpleSelectFields = rql.Groups["simple_select_fields"];
-                if (simpleSelectFields.Success)
+                // TODO: Support "select LastName as last" - easier to integrate with Raven.Server first and then just add new fields on top.
+                // TODO: Support "select "test""
+
+                var simpleSelectKeys = rql.Groups["simple_keys"];
+                var jsSelectFields = rql.Groups["js_fields"];
+
+                if (simpleSelectKeys.Success)
                 {
                     projectionFields["id()"] = GenerateColumnValue("id()", alias);
 
-                    foreach (Capture selectField in simpleSelectFields.Captures)
+                    foreach (Capture selectField in simpleSelectKeys.Captures)
                     {
                         projectionFields[selectField.Value] = GenerateColumnValue(selectField.Value, alias);
+                    }
+
+                    projectionFields["json()"] = GenerateColumnValue("json()", alias);
+
+                    alreadyPopulated = true;
+                }
+                else if (jsSelectFields.Success)
+                {
+                    var jsSelectKeys = rql.Groups["js_keys"];
+                    var jsSelectValues = rql.Groups["js_vals"];
+
+                    projectionFields["id()"] = GenerateColumnValue("id()", alias);
+
+                    for (int i = 0; i < jsSelectKeys.Captures.Count; i++)
+                    {
+                        Capture key = jsSelectKeys.Captures[i];
+
+                        if (jsSelectValues.Captures[i].Length == 0)
+                        {
+                            projectionFields[key.Value] = "null";
+                        }
+                        else
+                        {
+                            projectionFields[key.Value] = jsSelectValues.Captures[i].Value;
+                        }
                     }
 
                     projectionFields["json()"] = GenerateColumnValue("json()", alias);
@@ -131,7 +161,10 @@ namespace PgRvn.Server
             // If none captured, probably got "SELECT *" so use the RQL projection order
             if (rql != null && orderedColumns.Count == 0)
             {
-                orderedColumns = rql.Groups["select_field_keys"].Captures;
+                if (rql.Groups["simple_keys"].Success)
+                    orderedColumns = rql.Groups["simple_keys"].Captures;
+                else if (rql.Groups["js_keys"].Success)
+                    orderedColumns = rql.Groups["js_keys"].Captures;
             }
 
             foreach (Capture column in orderedColumns)
@@ -271,55 +304,5 @@ namespace PgRvn.Server
             rql = _rqlRegex.Match(queryToMatch);
             return rql.Success;
         }
-
-        //private static string GenerateProjectionString(Match match, string alias, Group selectFieldValues=null)
-        //{
-        //    // TODO: if columns.Success == false throw, also for each of the other groups
-
-        //    //if (replaceSourceColumns.Captures.Count != replaceInputs.Captures.Count &&
-        //    //    replaceSourceColumns.Captures.Count != replaceTexts.Captures.Count &&
-        //    //    replaceSourceColumns.Captures.Count != replaceDestColumns.Captures.Count &&
-        //    //    (selectFieldValues != null && replaceSourceColumns.Captures.Count != selectFieldValues.Captures.Count))
-        //    //{
-        //    //    // todo: provide these values and the SQL in the error message
-        //    //    throw new PgErrorException(PgErrorCodes.StatementTooComplex, "replace(..) function in SQL statement wasn't provided the expected parameters.");
-        //    //}
-
-        //    var replaceDict = new Dictionary<string, string>();
-        //    PopulateReplaceFields(replaceDict, match, alias);
-
-        //    var projection = "select { ";
-        //    for (int i = 0; i < columns.Captures.Count; i++)
-        //    {
-        //        var columnName = columns.Captures[i].Value;
-
-        //        // We have to project these because otherwise the order of the fields gets mixed up
-        //        if (columnName.Equals("id()", StringComparison.OrdinalIgnoreCase) ||
-        //            columnName.Equals("json()", StringComparison.OrdinalIgnoreCase)) 
-        //        {
-        //            projection += $"\"{columnName}\": \"\"";
-        //        }
-
-        //        if (replaceDict.TryGetValue(columnName, out var value))
-        //        {
-        //            projection += $"\"{columnName}\": {value}";
-        //        }
-        //        //else if (selectFieldValues != null) // TODO: Support this, i don't think it works as it is
-        //        //{
-        //        //    projection += $"\"{columnName}\": ({selectFieldValues.Captures[i].Value})";
-        //        //}
-        //        else
-        //        {
-        //            projection += $"\"{columnName}\": {alias}.{columnName}";
-        //        }
-
-        //        projection += ", ";
-        //    }
-
-        //    projection = projection[0..^2];
-        //    projection += " }";
-
-        //    return projection;
-        //}
     }
 }
