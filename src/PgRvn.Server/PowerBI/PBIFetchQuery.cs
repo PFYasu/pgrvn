@@ -7,10 +7,17 @@ namespace PgRvn.Server
 {
     public static class PBIFetchQuery
     {
-        private static readonly Regex _regex = new Regex(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""(?<src_columns>[^""]+)""(?:\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")?(?<replace>)|(?<replace>replace)\(""_"".""(?<src_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
+        private static readonly Regex _regex = new Regex(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""(?<src_columns>[^""]+)""(?:\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")?(?<replace>)|(?<replace>replace)\(""_"".""(?<src_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(\s+where\s+(?<where>.*?))?(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
             RegexOptions.Compiled);
         private static readonly Regex _rqlRegex = new Regex(@"^(?is)\s*(?<rql>(?:/\*rql\*/\s*)?from\s+(?<collection>[^\s\(\)]+)(?:\s+as\s+(?<alias>\S+))?.*?(?<select>\s+select\s+((?<js_select>({\s*(?<js_fields>(?<js_keys>.+?)(\s*:\s*((?<js_vals>.+?))|(?<js_vals>))\s*,\s*)*(?<js_fields>(?<js_keys>.+?)((\s*:\s*(?<js_vals>.+?))|(?<js_vals>))\s*)}))|(?<simple_select>((?<simple_keys>.+?)\s*,\s*)*(((?<simple_keys>\S+)|(?<simple_keys>"".* ""))(\s*as\s*(\S+|"".* "")\s*)?))))?(?:\s+include\s+(?<include>.*))?\s*)$",
             RegexOptions.Compiled);
+        private static readonly Regex _whereColumnRegex = new Regex(@"""_""\.""(?<column>.*?)""", RegexOptions.Compiled);
+        private static readonly Regex _whereOperatorRegex = new Regex(@"(?=.*?\s+)is(\s+not)?(?=\s+.+?)", RegexOptions.Compiled);
+        private static readonly Dictionary<string, string> _operatorMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "is", "=" },
+            { "is not", "!=" },
+        };
 
         private static bool TryGetMatches(string queryText, out List<Match> outMatches, out Match rql)
         {
@@ -116,7 +123,8 @@ namespace PgRvn.Server
                 // Note: It's crucial that the order of columns that is specified in the outer SQL is preserved.
                 var orderedProjectionFields = GetOrderedProjectionFields(matches[0], projectionFields, rql);
 
-                newRql = GenerateProjectedRql(rql, orderedProjectionFields);
+                // TODO: Make sure of which match is the where clause
+                newRql = GenerateProjectedRql(rql, orderedProjectionFields, matches);
             }
             else if (matches[0].Groups["table_name"].Success)
             {
@@ -244,7 +252,7 @@ namespace PgRvn.Server
             return val;
         }
 
-        private static string GenerateProjectedRql(Match rqlMatch, List<(string, string)> projectionFields)
+        private static string GenerateProjectedRql(Match rqlMatch, List<(string, string)> projectionFields, ICollection<Match> matches)
         {
             string rql = rqlMatch.Value;
 
@@ -253,28 +261,69 @@ namespace PgRvn.Server
             var where = rqlMatch.Groups["where"];
             var select = rqlMatch.Groups["select"];
 
-            // Find index where it's safe to insert the select clause
-            int selectIndex = select.Success ? select.Index : 
-                (where.Success ? where.Index + where.Length : 
-                (alias.Success ? alias.Index + alias.Length : 
-                (collection.Index + collection.Length)));
+            int aliasIndex = alias.Success ? (alias.Index + alias.Length) : (collection.Index + collection.Length);
+            int aliasLength = alias.Length;
 
-            // Remove existing select clause, must come before any inserts
-            if (select.Success)
-            {
-                rql = rql.Remove(select.Index, select.Length);
-            }
+            int whereIndex = where.Success ? where.Index : (aliasIndex + aliasLength);
+            int whereLength = where.Length;
 
-            // Insert an alias if doesn't exist
+            int selectIndex = select.Success ? select.Index : (whereIndex + whereLength);
+
+            // Insert alias clause if doesn't exist
             if (!alias.Success)
             {
                 const string newAliasClause = " as x";
                 rql = rql.Insert(collection.Index + collection.Length, newAliasClause);
 
+                aliasLength = newAliasClause.Length;
+                whereIndex += newAliasClause.Length;
                 selectIndex += newAliasClause.Length;
             }
 
-            // Generate new select clause
+            // Insert new where clause
+            var fullNewWhere = "";
+            foreach (var match in matches)
+            {
+                var sqlWhere = match.Groups["where"];
+
+                if (sqlWhere.Success)
+                {
+                    if (fullNewWhere.Length != 0)
+                        fullNewWhere += " and ";
+
+                    fullNewWhere = $"({sqlWhere.Value})";
+                }
+            }
+
+            if (fullNewWhere.Length != 0)
+            {
+                fullNewWhere = _whereColumnRegex.Replace(fullNewWhere, "${column}");
+                fullNewWhere = _whereOperatorRegex.Replace(fullNewWhere, (m) =>
+                {
+                    if (_operatorMap.TryGetValue(m.Value, out var val))
+                        return val;
+
+                    return m.Value;
+                });
+
+                if (where.Success)
+                    fullNewWhere = $" and ({fullNewWhere}) ";
+                else
+                    fullNewWhere = $"where {fullNewWhere} ";
+
+                rql = rql.Insert(whereIndex + whereLength, fullNewWhere);
+
+                whereLength += fullNewWhere.Length;
+                selectIndex += fullNewWhere.Length;
+            }
+
+            // Remove existing select clause
+            if (select.Success)
+            {
+                rql = rql.Remove(selectIndex, select.Length);
+            }
+
+            // Insert new select clause
             if (projectionFields.Count != 0)
             {
                 var projection = GenerateProjectionString(projectionFields);

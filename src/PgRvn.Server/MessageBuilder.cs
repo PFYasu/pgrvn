@@ -11,7 +11,7 @@ namespace PgRvn.Server
 {
     public class MessageBuilder : IDisposable
     {
-        private readonly IMemoryOwner<byte> _bufferOwner;
+        private IMemoryOwner<byte> _bufferOwner;
         private Memory<byte> Buffer => _bufferOwner.Memory;
 
         public MessageBuilder()
@@ -353,6 +353,16 @@ namespace PgRvn.Server
 
         private void WriteByte(byte value, Span<byte> buffer, ref int pos)
         {
+            // TODO: Work on this for every funct5ion
+            if(pos +1 > buffer.Length)
+            {
+                var oldOwner = _bufferOwner;
+                _bufferOwner = MemoryPool<byte>.Shared.Rent(buffer.Length * 2);
+                var newBuf = _bufferOwner.Memory.Span;
+                buffer.CopyTo(newBuf);
+                buffer = newBuf;
+                oldOwner.Dispose();
+            }
             buffer[pos] = value;
             pos += sizeof(byte);
         }
