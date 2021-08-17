@@ -14,6 +14,7 @@ namespace PgRvn.Server
         public static readonly string TableSchemaQuery = "select\r\n    pkcol.COLUMN_NAME as PK_COLUMN_NAME,\r\n    fkcol.TABLE_SCHEMA AS FK_TABLE_SCHEMA,\r\n    fkcol.TABLE_NAME AS FK_TABLE_NAME,\r\n    fkcol.COLUMN_NAME as FK_COLUMN_NAME,\r\n    fkcol.ORDINAL_POSITION as ORDINAL,\r\n    fkcon.CONSTRAINT_SCHEMA || '_' || fkcol.TABLE_NAME";
         public static readonly string TableSchemaSecondaryQuery = "select\r\n    pkcol.TABLE_SCHEMA AS PK_TABLE_SCHEMA,\r\n    pkcol.TABLE_NAME AS PK_TABLE_NAME,\r\n    pkcol.COLUMN_NAME as PK_COLUMN_NAME,\r\n    fkcol.COLUMN_NAME as FK_COLUMN_NAME,\r\n    fkcol.ORDINAL_POSITION as ORDINAL,\r\n    fkcon.CONSTRAINT_SCHEMA ";
         public static readonly string ConstraintsQuery = "select i.CONSTRAINT_SCHEMA || '_' || i.CONSTRAINT_NAME as INDEX_NAME, ii.COLUMN_NAME, ii.ORDINAL_POSITION, case when i.CONSTRAINT_TYPE = 'PRIMARY KEY' then 'Y' else 'N' end as PRIMARY_KEY\r\nfrom INFORMATION_SCHEMA.table_constraints i inner join INFORMATION_SCHEMA.key_column_usage ii on i.CONSTRAINT_SCHEMA = ii.CONSTRAINT_SCHEMA and i.CONSTRAINT_NAME = ii.CONSTRAINT_NAME and i.TABLE_SCHEMA = ii.TABLE_SCHEMA and i.TABLE_NAME = ii.TABLE_NAME";
+        public static readonly string VersionQuery = "select version()";
 
         public static readonly PgTable TypesResponse = new()
         {
@@ -2444,5 +2445,22 @@ namespace PgRvn.Server
             }
         };
 
+        public static readonly PgTable VersionResponse = new()
+        {
+            Columns = new List<PgColumn>()
+            {
+                new PgColumn("version", 0, PgTypeOIDs.Text, -1, PgFormat.Text),
+            },
+            Data = new List<PgDataRow>
+            {
+                new()
+                {
+                    ColumnData = new ReadOnlyMemory<byte>?[]
+                    {
+                        Encoding.ASCII.GetBytes("PostgreSQL 13.3, compiled by Visual C++ build 1914, 64-bit")
+                    }
+                }
+            }
+        };
     }
 }

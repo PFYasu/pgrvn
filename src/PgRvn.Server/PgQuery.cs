@@ -43,7 +43,7 @@ namespace PgRvn.Server
                 return powerBiQuery;
             }
 
-            return new SqlQuery(queryText, parametersDataTypes);
+            return new HardcodedQuery(queryText, parametersDataTypes);
         }
 
         protected PgFormat GetDefaultResultsFormat()
