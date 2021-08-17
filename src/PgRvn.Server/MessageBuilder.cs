@@ -353,7 +353,7 @@ namespace PgRvn.Server
 
         private void WriteByte(byte value, Span<byte> buffer, ref int pos)
         {
-            // TODO: Work on this for every funct5ion
+            // TODO: Work on this for every function
             if(pos +1 > buffer.Length)
             {
                 var oldOwner = _bufferOwner;

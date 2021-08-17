@@ -3,17 +3,21 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
-namespace PgRvn.Server
+namespace PgRvn.Server.PowerBI
 {
     public static class PBIFetchQuery
     {
-        private static readonly Regex _regex = new Regex(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""(?<src_columns>[^""]+)""(?:\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")?(?<replace>)|(?<replace>replace)\(""_"".""(?<src_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(\s+where\s+(?<where>.*?))?(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
+        private static readonly Regex FetchSqlRegex = new(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""(?<src_columns>[^""]+)""(?:\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")?(?<replace>)|(?<replace>replace)\(""_"".""(?<src_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(\s+where\s+(?<where>.*?))?(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
             RegexOptions.Compiled);
-        private static readonly Regex _rqlRegex = new Regex(@"^(?is)\s*(?<rql>(?:/\*rql\*/\s*)?from\s+(?<collection>[^\s\(\)]+)(?:\s+as\s+(?<alias>\S+))?.*?(?<select>\s+select\s+((?<js_select>({\s*(?<js_fields>(?<js_keys>.+?)(\s*:\s*((?<js_vals>.+?))|(?<js_vals>))\s*,\s*)*(?<js_fields>(?<js_keys>.+?)((\s*:\s*(?<js_vals>.+?))|(?<js_vals>))\s*)}))|(?<simple_select>((?<simple_keys>.+?)\s*,\s*)*(((?<simple_keys>\S+)|(?<simple_keys>"".* ""))(\s*as\s*(\S+|"".* "")\s*)?))))?(?:\s+include\s+(?<include>.*))?\s*)$",
+
+        private static readonly Regex RqlRegex = new(@"^(?is)\s*(?<rql>(?:/\*rql\*/\s*)?from\s+(?<collection>[^\s\(\)]+)(?:\s+as\s+(?<alias>\S+))?.*?(?<select>\s+select\s+((?<js_select>({\s*(?<js_fields>(?<js_keys>.+?)(\s*:\s*((?<js_vals>.+?))|(?<js_vals>))\s*,\s*)*(?<js_fields>(?<js_keys>.+?)((\s*:\s*(?<js_vals>.+?))|(?<js_vals>))\s*)}))|(?<simple_select>((?<simple_keys>.+?)\s*,\s*)*(((?<simple_keys>\S+)|(?<simple_keys>"".* ""))(\s*as\s*(\S+|"".* "")\s*)?))))?(?:\s+include\s+(?<include>.*))?\s*)$",
             RegexOptions.Compiled);
-        private static readonly Regex _whereColumnRegex = new Regex(@"""_""\.""(?<column>.*?)""", RegexOptions.Compiled);
-        private static readonly Regex _whereOperatorRegex = new Regex(@"(?=.*?\s+)is(\s+not)?(?=\s+.+?)", RegexOptions.Compiled);
-        private static readonly Dictionary<string, string> _operatorMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+
+        private static readonly Regex WhereColumnRegex = new(@"""_""\.""(?<column>.*?)""", RegexOptions.Compiled);
+
+        private static readonly Regex WhereOperatorRegex = new(@"(?=.*?\s+)is(\s+not)?(?=\s+.+?)", RegexOptions.Compiled);
+
+        private static readonly Dictionary<string, string> OperatorMap = new(StringComparer.OrdinalIgnoreCase)
         {
             { "is", "=" },
             { "is not", "!=" },
@@ -30,7 +34,7 @@ namespace PgRvn.Server
             // Queries can have inner queries that we need to parse, so here we collect those
             do
             {
-                var match = _regex.Match(queryToMatch);
+                var match = FetchSqlRegex.Match(queryToMatch);
 
                 if (!match.Success)
                 {
@@ -51,7 +55,7 @@ namespace PgRvn.Server
         public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out PgQuery pgQuery)
         {
             // Match queries sent by PowerBI, either RQL queries wrapped in an SQL statement OR generic SQL queries
-            if (!TryGetMatches(queryText, out var matches, out Match rql))
+            if (!TryGetMatches(queryText, out var matches, out var rql))
             {
                 pgQuery = null;
                 return false;
@@ -60,15 +64,12 @@ namespace PgRvn.Server
             string newRql = null;
             if (rql != null && rql.Success)
             {
-                // Handle RQL type query
-                var alias = rql.Groups["alias"].Success ? rql.Groups["alias"].Value : "x";
+                // TODO: Integrate with Raven.Server's QueryParser to support things like "select LastName as last" and "select "test""
 
+                var alias = rql.Groups["alias"].Success ? rql.Groups["alias"].Value : "x";
 
                 var projectionFields = new Dictionary<string, string>();
                 bool alreadyPopulated = false;
-
-                // TODO: Support "select LastName as last" - easier to integrate with Raven.Server first and then just add new fields on top.
-                // TODO: Support "select "test""
 
                 var simpleSelectKeys = rql.Groups["simple_keys"];
                 var jsSelectFields = rql.Groups["js_fields"];
@@ -93,9 +94,9 @@ namespace PgRvn.Server
 
                     projectionFields["id()"] = GenerateColumnValue("id()", alias);
 
-                    for (int i = 0; i < jsSelectKeys.Captures.Count; i++)
+                    for (var i = 0; i < jsSelectKeys.Captures.Count; i++)
                     {
-                        Capture key = jsSelectKeys.Captures[i];
+                        var key = jsSelectKeys.Captures[i];
 
                         if (jsSelectValues.Captures[i].Length == 0)
                         {
@@ -113,26 +114,25 @@ namespace PgRvn.Server
                 }
 
                 // Populate the columns starting from the inner-most SQL
-                for (int i = matches.Count - 1; i >= 0; i--)
+                for (var i = matches.Count - 1; i >= 0; i--)
                 {
-                    Match match = matches[i];
-                    alreadyPopulated = alreadyPopulated ? alreadyPopulated : i != matches.Count - 1;
+                    var match = matches[i];
+                    alreadyPopulated = alreadyPopulated || i != matches.Count - 1;
                     PopulateProjectionFields(match, projectionFields, alias, alreadyPopulated);
                 }
 
                 // Note: It's crucial that the order of columns that is specified in the outer SQL is preserved.
                 var orderedProjectionFields = GetOrderedProjectionFields(matches[0], projectionFields, rql);
 
-                // TODO: Make sure of which match is the where clause
                 newRql = GenerateProjectedRql(rql, orderedProjectionFields, matches);
             }
             else if (matches[0].Groups["table_name"].Success)
             {
-                // TODO: Remove this
                 if (matches.Count != 1)
-                    throw new Exception("Too many matches, investigate."); 
+                    throw new PgErrorException(PgErrorCodes.StatementTooComplex,
+                        "Unexpected PowerBI nested SQL query. Query: " + queryText); 
 
-                // Handle generic type query
+                // Handle generic query
                 var alias = "x";
 
                 var projectionFields = new Dictionary<string, string>();
@@ -158,13 +158,19 @@ namespace PgRvn.Server
             return true;
         }
 
-        private static List<(string, string)> GetOrderedProjectionFields(Match match, Dictionary<string, string> projectionFields, Match rql=null)
+        private static List<(string, string)> GetOrderedProjectionFields(ICollection<Match> matches, Dictionary<string, string> projectionFields, Match rql=null)
         {
             var orderedProjectionFields = new List<(string, string)>();
 
             // TODO: Maybe try this for every match instead of just the first
             // Get the order from the outmost SELECT
-            var orderedColumns = match.Groups["all_columns"].Captures;
+            CaptureCollection orderedColumns = default;
+            foreach (var match in matches)
+            {
+                orderedColumns = match.Groups["all_columns"].Captures;
+                if (orderedColumns.Count != 0)
+                    break;
+            }
 
             // If none captured, probably got "SELECT *" so use the RQL projection order
             if (rql != null && orderedColumns.Count == 0)
@@ -192,7 +198,7 @@ namespace PgRvn.Server
 
         private static void PopulateProjectionFields(
             Match match, 
-            Dictionary<string, string> projectionFields, 
+            IDictionary<string, string> projectionFields, 
             string alias, 
             bool alreadyPopulatedByPreviousLayer)
         {
@@ -203,7 +209,7 @@ namespace PgRvn.Server
             var replaceTexts = match.Groups["replace_texts"].Captures;
 
             var replaceIndex = 0;
-            for (int i = 0; i < destColumns.Count; i++)
+            for (var i = 0; i < destColumns.Count; i++)
             {
                 var destColumn = destColumns[i].Value;
                 var srcColumn = srcColumns[i].Value;
@@ -254,20 +260,20 @@ namespace PgRvn.Server
 
         private static string GenerateProjectedRql(Match rqlMatch, List<(string, string)> projectionFields, ICollection<Match> matches)
         {
-            string rql = rqlMatch.Value;
+            var rql = rqlMatch.Value;
 
             var collection = rqlMatch.Groups["collection"];
             var alias = rqlMatch.Groups["alias"];
             var where = rqlMatch.Groups["where"];
             var select = rqlMatch.Groups["select"];
 
-            int aliasIndex = alias.Success ? (alias.Index + alias.Length) : (collection.Index + collection.Length);
-            int aliasLength = alias.Length;
+            var aliasIndex = alias.Success ? (alias.Index + alias.Length) : (collection.Index + collection.Length);
+            var aliasLength = alias.Length;
 
-            int whereIndex = where.Success ? where.Index : (aliasIndex + aliasLength);
-            int whereLength = where.Length;
+            var whereIndex = where.Success ? where.Index : (aliasIndex + aliasLength);
+            var whereLength = where.Length;
 
-            int selectIndex = select.Success ? select.Index : (whereIndex + whereLength);
+            var selectIndex = select.Success ? select.Index : (whereIndex + whereLength);
 
             // Insert alias clause if doesn't exist
             if (!alias.Success)
@@ -297,10 +303,10 @@ namespace PgRvn.Server
 
             if (fullNewWhere.Length != 0)
             {
-                fullNewWhere = _whereColumnRegex.Replace(fullNewWhere, "${column}");
-                fullNewWhere = _whereOperatorRegex.Replace(fullNewWhere, (m) =>
+                fullNewWhere = WhereColumnRegex.Replace(fullNewWhere, "${column}");
+                fullNewWhere = WhereOperatorRegex.Replace(fullNewWhere, (m) =>
                 {
-                    if (_operatorMap.TryGetValue(m.Value, out var val))
+                    if (OperatorMap.TryGetValue(m.Value, out var val))
                         return val;
 
                     return m.Value;
@@ -337,9 +343,9 @@ namespace PgRvn.Server
         {
             var projection = " select { ";
 
-            foreach (var field in projectionFields)
+            foreach (var (fieldName, fieldValue) in projectionFields)
             {
-                projection += $"\"{field.Item1}\": {field.Item2}, ";
+                projection += $"\"{fieldName}\": {fieldValue}, ";
             }
 
             projection = projection[0..^2];
@@ -350,7 +356,7 @@ namespace PgRvn.Server
 
         private static bool IsRql(string queryToMatch, out Match rql)
         {
-            rql = _rqlRegex.Match(queryToMatch);
+            rql = RqlRegex.Match(queryToMatch);
             return rql.Success;
         }
     }
