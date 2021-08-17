@@ -3,12 +3,11 @@ using Raven.Client.Documents.Operations;
 using System;
 using System.Collections.Generic;
 using System.IO.Pipelines;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PgRvn.Server
+namespace PgRvn.Server.PowerBI
 {
     public class PBIAllCollectionsQuery : RqlQuery
     {
@@ -19,9 +18,10 @@ namespace PgRvn.Server
 
         public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out PgQuery pgQuery)
         {
-            // TODO: Match either \n or \r\n
-            var tableQuery = "select TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE\nfrom INFORMATION_SCHEMA.tables\nwhere TABLE_SCHEMA not in ('information_schema', 'pg_catalog')\norder by TABLE_SCHEMA, TABLE_NAME";
-            if (queryText.Replace("\r", string.Empty) == tableQuery)
+            const string tableQuery = "select TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE\nfrom INFORMATION_SCHEMA.tables\nwhere TABLE_SCHEMA not in ('information_schema', 'pg_catalog')\norder by TABLE_SCHEMA, TABLE_NAME";
+
+            queryText = queryText.Replace("\r\n", "\n").Replace("\r", "\n");
+            if (queryText.Equals(tableQuery, StringComparison.OrdinalIgnoreCase))
             {
                 pgQuery = new PBIAllCollectionsQuery(queryText, parametersDataTypes, documentStore);
                 return true;

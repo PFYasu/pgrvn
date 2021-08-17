@@ -4,6 +4,7 @@ using System.IO.Pipelines;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using TSQL;
 
 
 namespace PgRvn.Server
@@ -16,20 +17,8 @@ namespace PgRvn.Server
         {
         }
 
-        // TODO: Make this the only constructor, add a TryParse method and rename this class - HardcodedQuery ? Maybe not.
-        public HardcodedQuery(string queryString, int[] parametersDataTypes, PgTable results) : base(queryString, parametersDataTypes)
+        public void Parse(bool allowMultipleStatements)
         {
-            _result = results;
-        }
-
-        public bool Parse(bool allowMultipleStatements)
-        {
-            // TODO: Make this better, shouldn't have separate logic for previously given result..
-            if (_result != null)
-            {
-                return true;
-            }
-
             var sqlStatements = TSQLStatementReader.ParseStatements(QueryString);
             if (allowMultipleStatements == false && sqlStatements.Count != 1)
             {
@@ -38,59 +27,61 @@ namespace PgRvn.Server
 
             foreach (var stmt in sqlStatements)
             {
-                var powerBIMatch = PowerBIConfig.TypesQuery;
-                if (QueryString.Equals(powerBIMatch))
+                var powerBiMatch = PowerBIConfig.TypesQuery;
+                if (QueryString.Equals(powerBiMatch))
                 {
                     _result = PowerBIConfig.TypesResponse;
-                    return true;
+                    return;
                 }
 
-                powerBIMatch = PowerBIConfig.CompositeTypesQuery;
-
-                if (QueryString.Equals(powerBIMatch))
+                powerBiMatch = PowerBIConfig.CompositeTypesQuery;
+                if (QueryString.Equals(powerBiMatch))
                 {
                     _result = PowerBIConfig.CompositeTypesResponse;
-                    return true;
+                    return;
                 }
 
-                powerBIMatch = PowerBIConfig.EnumTypesQuery;
+                powerBiMatch = PowerBIConfig.EnumTypesQuery;
 
-                if (QueryString.Equals(powerBIMatch))
+                if (QueryString.Equals(powerBiMatch))
                 {
                     _result = PowerBIConfig.EnumTypesResponse;
-                    return true;
+                    return;
                 }
 
-                powerBIMatch = PowerBIConfig.TableSchemaQuery;
-                if (QueryString.StartsWith(powerBIMatch))
+                powerBiMatch = PowerBIConfig.TableSchemaQuery;
+                if (QueryString.StartsWith(powerBiMatch))
                 {
                     _result = PowerBIConfig.TableSchemaResponse;
+                    return;
                 }
 
-                powerBIMatch = PowerBIConfig.TableSchemaSecondaryQuery;
-                if (QueryString.StartsWith(powerBIMatch))
+                powerBiMatch = PowerBIConfig.TableSchemaSecondaryQuery;
+                if (QueryString.StartsWith(powerBiMatch))
                 {
                     _result = PowerBIConfig.TableSchemaSecondaryResponse;
+                    return;
                 }
 
-                powerBIMatch = PowerBIConfig.ConstraintsQuery;
-                if (QueryString.StartsWith(powerBIMatch))
+                powerBiMatch = PowerBIConfig.ConstraintsQuery;
+                if (QueryString.StartsWith(powerBiMatch))
                 {
                     _result = PowerBIConfig.ConstraintsResponse;
+                    return;
                 }
 
-
-                powerBIMatch = PowerBIConfig.VersionQuery;
-                if (QueryString.Equals(powerBIMatch, StringComparison.OrdinalIgnoreCase))
+                powerBiMatch = PowerBIConfig.VersionQuery;
+                if (QueryString.Equals(powerBiMatch, StringComparison.OrdinalIgnoreCase))
                 {
                     _result = PowerBIConfig.VersionResponse;
+                    return;
                 }
 
                 // TODO: Treat the results like any other data source and acknowledge the results format
                 var resultsFormat = GetDefaultResultsFormat();
 
-                powerBIMatch = "select character_set_name from INFORMATION_SCHEMA.character_sets";
-                if (QueryString.Equals(powerBIMatch))
+                powerBiMatch = "select character_set_name from INFORMATION_SCHEMA.character_sets";
+                if (QueryString.Equals(powerBiMatch))
                 {
                     _result = new PgTable
                     {
@@ -110,11 +101,9 @@ namespace PgRvn.Server
                         }
                     };
 
-                    return true;
+                    return;
                 }
             }
-
-            return true;
         }
 
         public override async Task<ICollection<PgColumn>> Init(bool allowMultipleStatements)
@@ -124,7 +113,7 @@ namespace PgRvn.Server
                 return default;
             }
 
-            Parse(allowMultipleStatements); // todo: handle error (return value)
+            Parse(allowMultipleStatements);
 
             if (_result != null)
             {

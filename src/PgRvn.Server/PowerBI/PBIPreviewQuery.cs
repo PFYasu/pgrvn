@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PgRvn.Server
+namespace PgRvn.Server.PowerBI
 {
     public class PBIPreviewQuery : RqlQuery
     {
