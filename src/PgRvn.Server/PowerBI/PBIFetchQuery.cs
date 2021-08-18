@@ -1,6 +1,7 @@
 ﻿using Raven.Client.Documents;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace PgRvn.Server.PowerBI
@@ -122,7 +123,7 @@ namespace PgRvn.Server.PowerBI
                 }
 
                 // Note: It's crucial that the order of columns that is specified in the outer SQL is preserved.
-                var orderedProjectionFields = GetOrderedProjectionFields(matches[0], projectionFields, rql);
+                var orderedProjectionFields = GetOrderedProjectionFields(matches, projectionFields, rql);
 
                 newRql = GenerateProjectedRql(rql, orderedProjectionFields, matches);
             }
@@ -138,7 +139,7 @@ namespace PgRvn.Server.PowerBI
                 var projectionFields = new Dictionary<string, string>();
                 PopulateProjectionFields(matches[0], projectionFields, alias, false);
 
-                var orderedProjectionFields = GetOrderedProjectionFields(matches[0], projectionFields);
+                var orderedProjectionFields = GetOrderedProjectionFields(matches, projectionFields);
 
                 // TODO: Provide these as parameters to prevent SQL injection (depends on RavenDB-17075)
                 newRql = $"from {matches[0].Groups["table_name"].Value} as {alias} ";
@@ -158,13 +159,12 @@ namespace PgRvn.Server.PowerBI
             return true;
         }
 
-        private static List<(string, string)> GetOrderedProjectionFields(ICollection<Match> matches, Dictionary<string, string> projectionFields, Match rql=null)
+        private static List<KeyValuePair<string, string>> GetOrderedProjectionFields(IEnumerable<Match> matches, IReadOnlyDictionary<string, string> projectionFields, Match rql=null)
         {
-            var orderedProjectionFields = new List<(string, string)>();
+            var orderedProjectionFields = new List<KeyValuePair<string, string>>();
 
-            // TODO: Maybe try this for every match instead of just the first
-            // Get the order from the outmost SELECT
-            CaptureCollection orderedColumns = default;
+            // Get the order from the outermost SELECT
+            ICollection<Capture> orderedColumns = Array.Empty<Capture>();
             foreach (var match in matches)
             {
                 orderedColumns = match.Groups["all_columns"].Captures;
@@ -172,7 +172,7 @@ namespace PgRvn.Server.PowerBI
                     break;
             }
 
-            // If none captured, probably got "SELECT *" so use the RQL projection order
+            // If none captured use the RQL projection order
             if (rql != null && orderedColumns.Count == 0)
             {
                 if (rql.Groups["simple_keys"].Success)
@@ -181,16 +181,17 @@ namespace PgRvn.Server.PowerBI
                     orderedColumns = rql.Groups["js_keys"].Captures;
             }
 
-            foreach (Capture column in orderedColumns)
+            // If there's no RQL projection order use orderedColumns
+            if (orderedColumns.Count == 0)
             {
-                if (projectionFields.TryGetValue(column.Value, out var val))
-                {
-                    orderedProjectionFields.Add((column.Value, val));
-                }
-                else
-                {
-                    orderedProjectionFields.Add((column.Value, "null"));
-                }
+                return projectionFields.ToList();
+            }
+
+            foreach (var column in orderedColumns)
+            {
+                orderedProjectionFields.Add(projectionFields.TryGetValue(column.Value, out var val)
+                    ? new KeyValuePair<string, string>(column.Value, val)
+                    : new KeyValuePair<string, string>(column.Value, "null"));
             }
 
             return orderedProjectionFields;
@@ -258,7 +259,7 @@ namespace PgRvn.Server.PowerBI
             return val;
         }
 
-        private static string GenerateProjectedRql(Match rqlMatch, List<(string, string)> projectionFields, ICollection<Match> matches)
+        private static string GenerateProjectedRql(Match rqlMatch, List<KeyValuePair<string, string>> projectionFields, ICollection<Match> matches)
         {
             var rql = rqlMatch.Value;
 
@@ -287,18 +288,18 @@ namespace PgRvn.Server.PowerBI
             }
 
             // Insert new where clause
+            // Note: Filtering of projected columns is not supported
             var fullNewWhere = "";
             foreach (var match in matches)
             {
                 var sqlWhere = match.Groups["where"];
+                if (!sqlWhere.Success) 
+                    continue;
 
-                if (sqlWhere.Success)
-                {
-                    if (fullNewWhere.Length != 0)
-                        fullNewWhere += " and ";
+                if (fullNewWhere.Length != 0)
+                    fullNewWhere += " and ";
 
-                    fullNewWhere = $"({sqlWhere.Value})";
-                }
+                fullNewWhere += $"({sqlWhere.Value})";
             }
 
             if (fullNewWhere.Length != 0)
@@ -339,7 +340,7 @@ namespace PgRvn.Server.PowerBI
             return rql;
         }
 
-        private static string GenerateProjectionString(IEnumerable<(string, string)> projectionFields)
+        private static string GenerateProjectionString(IEnumerable<KeyValuePair<string, string>> projectionFields)
         {
             var projection = " select { ";
 
