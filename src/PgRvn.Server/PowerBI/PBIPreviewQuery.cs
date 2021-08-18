@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using PgRvn.Server.Types;
 
 namespace PgRvn.Server.PowerBI
 {
@@ -81,10 +82,10 @@ namespace PgRvn.Server.PowerBI
 
             return new List<PgColumn>
             {
-                new PgColumn("column_name", 0, PgTypeOIDs.Name, -1, PgFormat.Text),
-                new PgColumn("ordinal_position", 1, PgTypeOIDs.Int4, -1, PgFormat.Binary),
-                new PgColumn("is_nullable", 2, PgTypeOIDs.Varchar, -1, PgFormat.Text),
-                new PgColumn("data_type", 3, PgTypeOIDs.Varchar, -1, PgFormat.Text),
+                new("column_name", 0, PgName.Default,PgFormat.Text),
+                new("ordinal_position", 1, PgInt4.Default, PgFormat.Binary),
+                new("is_nullable", 2, PgVarchar.Default, PgFormat.Text),
+                new("data_type", 3, PgVarchar.Default, PgFormat.Text),
             };
         }
     }

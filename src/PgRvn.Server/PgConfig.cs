@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using PgRvn.Server.Types;
 
 namespace PgRvn.Server
 {
@@ -29,19 +30,19 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new PgColumn("nspname", 0, PgTypeOIDs.Name, -1, PgFormat.Text),
-                new PgColumn("oid", 1, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
-                new PgColumn("typnamespace", 2, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
-                new PgColumn("typname", 3, PgTypeOIDs.Name, -1, PgFormat.Text),
-                new PgColumn("typtype", 4, PgTypeOIDs.Char, sizeof(byte), PgFormat.Text, 1),
-                new PgColumn("typrelid", 5, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
-                new PgColumn("typnotnull", 6, PgTypeOIDs.Bool, sizeof(bool), PgFormat.Text),
-                new PgColumn("relkind", 7, PgTypeOIDs.Char, sizeof(byte), PgFormat.Text, 1),
-                new PgColumn("elemtypoid", 8, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
-                new PgColumn("elemtypname", 9, PgTypeOIDs.Name, -1, PgFormat.Text),
-                new PgColumn("elemrelkind", 10, PgTypeOIDs.Char, sizeof(byte), PgFormat.Text, 1),
-                new PgColumn("elemtyptype", 11, PgTypeOIDs.Char, sizeof(byte), PgFormat.Text, 1),
-                new PgColumn("ord", 12, PgTypeOIDs.Int4, sizeof(int), PgFormat.Text),
+                new PgColumn("nspname", 0, PgName.Default, PgFormat.Text),
+                new PgColumn("oid", 1, PgOid.Default, PgFormat.Text),
+                new PgColumn("typnamespace", 2, PgOid.Default, PgFormat.Text),
+                new PgColumn("typname", 3, PgName.Default, PgFormat.Text),
+                new PgColumn("typtype", 4, PgChar.Default, PgFormat.Text, 1),
+                new PgColumn("typrelid", 5, PgOid.Default, PgFormat.Text),
+                new PgColumn("typnotnull", 6, PgBool.Default, PgFormat.Text),
+                new PgColumn("relkind", 7, PgChar.Default, PgFormat.Text, 1),
+                new PgColumn("elemtypoid", 8, PgOid.Default, PgFormat.Text),
+                new PgColumn("elemtypname", 9, PgName.Default, PgFormat.Text),
+                new PgColumn("elemrelkind", 10, PgChar.Default, PgFormat.Text, 1),
+                new PgColumn("elemtyptype", 11, PgChar.Default, PgFormat.Text, 1),
+                new PgColumn("ord", 12, PgInt4.Default, PgFormat.Text),
             },
 
             Data = new List<PgDataRow>

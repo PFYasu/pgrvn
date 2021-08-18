@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using PgRvn.Server.Types;
 
 namespace PgRvn.Server
 {
@@ -79,18 +80,16 @@ namespace PgRvn.Server
         /// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero.
         /// </summary>
         public short ColumnIndex;
-        public int TypeObjectId;
-        public short DataTypeSize;
+        public IPgType PgType;
         public int TypeModifier;
         public PgFormat FormatCode;
 
-        public PgColumn(string name, short columnIndex, int typeOid, short dataTypeSize, PgFormat formatCode, int typeModifier = -1, int tableOid = 0)
+        public PgColumn(string name, short columnIndex, IPgType pgType, PgFormat formatCode, int typeModifier = -1, int tableOid = 0)
         {
             Name = name;
             TableObjectId = tableOid;
             ColumnIndex = columnIndex;
-            TypeObjectId = typeOid;
-            DataTypeSize = dataTypeSize;
+            PgType = pgType;
             TypeModifier = typeModifier;
             FormatCode = formatCode;
         }

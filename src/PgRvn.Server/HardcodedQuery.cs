@@ -4,6 +4,7 @@ using System.IO.Pipelines;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using PgRvn.Server.Types;
 using TSQL;
 
 
@@ -87,7 +88,7 @@ namespace PgRvn.Server
                     {
                         Columns = new List<PgColumn>
                         {
-                            new PgColumn("character_set_name", 0, PgTypeOIDs.Name, -1, resultsFormat),
+                            new PgColumn("character_set_name", 0, PgName.Default, resultsFormat),
                         },
                         Data = new List<PgDataRow>
                         {
