@@ -6,10 +6,14 @@ using System.Threading.Tasks;
 
 namespace PgRvn.Server.Types
 {
-    public class PgName : IPgType
+    public class PgName : PgType
     {
         public static readonly PgName Default = new();
-        public int Oid => PgTypeOIDs.Name;
-        public short Size => 64;
+        public override int Oid => PgTypeOIDs.Name;
+        public override short Size => 64;
+        public override byte[] ToBytes(object value, PgFormat formatCode)
+        {
+            return Utf8GetBytes(value);
+        }
     }
 }

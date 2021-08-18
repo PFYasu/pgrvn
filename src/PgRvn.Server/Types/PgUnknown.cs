@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 
 namespace PgRvn.Server.Types
 {
-    public class PgJson : PgType
+    public class PgUnknown : PgType
     {
-        public static readonly PgJson Default = new();
-        public override int Oid => PgTypeOIDs.Json;
+        public static readonly PgUnknown Default = new();
+        public override int Oid => PgTypeOIDs.Unknown;
         public override short Size => -1;
         public override int TypeModifier => -1;
 
@@ -20,7 +20,7 @@ namespace PgRvn.Server.Types
 
         public override object FromBytes(byte[] buffer, PgFormat formatCode)
         {
-            return Utf8GetString(buffer);
+            return buffer;
         }
     }
 }

@@ -6,21 +6,21 @@ using System.Threading.Tasks;
 
 namespace PgRvn.Server.Types
 {
-    public class PgJson : PgType
+    public class PgBytea : PgType
     {
-        public static readonly PgJson Default = new();
-        public override int Oid => PgTypeOIDs.Json;
+        public static readonly PgBytea Default = new();
+        public override int Oid => PgTypeOIDs.Bytea;
         public override short Size => -1;
         public override int TypeModifier => -1;
 
         public override byte[] ToBytes(object value, PgFormat formatCode)
         {
-            return Utf8GetBytes(value);
+            return (byte[])value;
         }
 
         public override object FromBytes(byte[] buffer, PgFormat formatCode)
         {
-            return Utf8GetString(buffer);
+            return buffer; // TODO: Verify this works
         }
     }
 }

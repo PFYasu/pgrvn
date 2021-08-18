@@ -4,6 +4,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO.Pipelines;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using PgRvn.Server.PowerBI;
@@ -66,45 +67,27 @@ namespace PgRvn.Server
 
         public abstract void Dispose();
 
-        public virtual void Bind(IEnumerable<byte[]> parameters, short[] parameterFormatCodes, short[] resultColumnFormatCodes)
+        public virtual void Bind(ICollection<byte[]> parameters, short[] parameterFormatCodes, short[] resultColumnFormatCodes)
         {
             _resultColumnFormatCodes = resultColumnFormatCodes;
 
-            PgFormat? defaultDataFormat = null;
-            switch (parameterFormatCodes.Length)
+            PgFormat? defaultParamDataFormat = parameterFormatCodes.Length switch
             {
-                case 0:
-                    defaultDataFormat = PgFormat.Text;
-                    break;
-                case 1:
-                    defaultDataFormat = parameterFormatCodes[0] == 1 ? PgFormat.Binary : PgFormat.Text;
-                    break;
-                default:
-                    break;
-            }
+                0 => PgFormat.Text,
+                1 => parameterFormatCodes[0] == 1 ? PgFormat.Binary : PgFormat.Text,
+                _ => (parameters.Count == parameterFormatCodes.Length) ? null :
+                     throw new PgErrorException(PgErrorCodes.ProtocolViolation, 
+                         $"Got '{parameters.Count}' parameters while given '{parameterFormatCodes.Length}' parameter format codes.")
+            };
 
-            int i = 0;
-            foreach (var parameter in parameters)
+            for (var i = 0; i < parameters.Count; i++)
             {
-                int dataType = 0;
-                if (i < ParametersDataTypes.Length)
-                {
-                    dataType = ParametersDataTypes[i];
-                }
+                var dataType = i < ParametersDataTypes.Length ? ParametersDataTypes[i] : PgTypeOIDs.Unknown;
+                var dataFormat = defaultParamDataFormat ?? (parameterFormatCodes[i] == 1 ? PgFormat.Binary : PgFormat.Text);
 
-                var dataFormat = defaultDataFormat ?? (parameterFormatCodes[i] == 1 ? PgFormat.Binary : PgFormat.Text);
-                object processedParameter = parameter;
-                if (PgTypeConverter.FromBytes.TryGetValue((dataType, dataFormat), out var fromBytesFunc))
-                {
-                    processedParameter = fromBytesFunc(parameter);
-                }
-                else
-                {
-                    processedParameter = PgTypeConverter.FromBytes[(0, dataFormat)](parameter);
-                }
-
+                var pgType = PgType.Parse(dataType);
+                var processedParameter = pgType.FromBytes(parameters.ElementAt(i), dataFormat);
                 Parameters.Add($"p{i + 1}", processedParameter);
-                i++;
             }
         }
     }

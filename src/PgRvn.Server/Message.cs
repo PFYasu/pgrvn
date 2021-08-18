@@ -80,11 +80,11 @@ namespace PgRvn.Server
         /// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero.
         /// </summary>
         public short ColumnIndex;
-        public IPgType PgType;
+        public PgType PgType;
         public int TypeModifier;
         public PgFormat FormatCode;
 
-        public PgColumn(string name, short columnIndex, IPgType pgType, PgFormat formatCode, int typeModifier = -1, int tableOid = 0)
+        public PgColumn(string name, short columnIndex, PgType pgType, PgFormat formatCode, int typeModifier = -1, int tableOid = 0)
         {
             Name = name;
             TableObjectId = tableOid;

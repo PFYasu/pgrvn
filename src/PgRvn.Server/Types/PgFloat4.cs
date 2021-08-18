@@ -6,33 +6,31 @@ using System.Threading.Tasks;
 
 namespace PgRvn.Server.Types
 {
-    public class PgBool : PgType
+    public class PgFloat4 : PgType
     {
-        public static readonly PgBool Default = new();
-        public static byte[] TrueBuffer = { 1 }, FalseBuffer = { 0 };
-
-        public override int Oid => PgTypeOIDs.Bool;
-        public override short Size => sizeof(byte);
+        public static readonly PgFloat4 Default = new();
+        public override int Oid => PgTypeOIDs.Float4;
+        public override short Size => sizeof(float);
         public override int TypeModifier => -1;
 
         public override byte[] ToBytes(object value, PgFormat formatCode)
         {
             if (formatCode == PgFormat.Text)
             {
-                return (bool)value ? Utf8GetBytes("t") : Utf8GetBytes("f");
+                return Utf8GetBytes(value);
             }
 
-            return (bool)value ? TrueBuffer : FalseBuffer;
+            return BitConverter.GetBytes((float)value).Reverse().ToArray();
         }
 
         public override object FromBytes(byte[] buffer, PgFormat formatCode)
         {
             if (formatCode == PgFormat.Text)
             {
-                return Utf8GetString(buffer).Equals("t");
+                return float.Parse(Utf8GetString(buffer));
             }
 
-            return buffer.Equals(TrueBuffer);
+            return BitConverter.ToSingle(buffer.Reverse().ToArray());
         }
     }
 }

@@ -24,8 +24,6 @@ namespace PgRvn.Server
             ["TimeZone"] = "UTC",
         };
 
-        public static byte[] TrueBuffer = { 1 }, FalseBuffer = { 0 };
-
         public static readonly PgTable NpgsqlInitialQueryResponse = new()
         {
             Columns = new List<PgColumn>
