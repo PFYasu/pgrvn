@@ -36,7 +36,7 @@ namespace PgRvn.Server
                 }
 
                 powerBiMatch = PowerBIConfig.CompositeTypesQuery;
-                if (QueryString.Equals(powerBiMatch))
+                if (QueryString.StartsWith(powerBiMatch))
                 {
                     _result = PowerBIConfig.CompositeTypesResponse;
                     return;
@@ -72,7 +72,7 @@ namespace PgRvn.Server
                 }
 
                 powerBiMatch = PowerBIConfig.VersionQuery;
-                if (QueryString.Equals(powerBiMatch, StringComparison.OrdinalIgnoreCase))
+                if (QueryString.Replace("\n", "").Replace("\r", "").Equals(powerBiMatch, StringComparison.OrdinalIgnoreCase))
                 {
                     _result = PowerBIConfig.VersionResponse;
                     return;
@@ -107,7 +107,7 @@ namespace PgRvn.Server
             }
         }
 
-        public override async Task<ICollection<PgColumn>> Init(bool allowMultipleStatements)
+        public override async Task<ICollection<PgColumn>> Init(bool allowMultipleStatements = false)
         {
             if (IsEmptyQuery)
             {

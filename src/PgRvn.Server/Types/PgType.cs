@@ -24,7 +24,7 @@ namespace PgRvn.Server.Types
             return Encoding.UTF8.GetString(buffer);
         }
 
-        public static PgType Parse(int dataType)
+        public static PgType Parse(int dataType) // todo: int typeModifier
         {
             return dataType switch
             {

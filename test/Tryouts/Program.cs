@@ -146,14 +146,15 @@ namespace Tryouts
                 return;
             }
 
-            //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
-            var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
 
             //InitODBC();
 
             Console.ReadLine();
 
+            //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
+            var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
             //using var conn = new NpgsqlConnection(connString); conn.Open();
+            //Select(conn, "from Orders as o where o.Company = \"TestCompany\""); 
 
             //var dto = DateTime.Parse("1998-05-05T01:02:03.0405060Z");
             ////var dto = new TimeSpan(1, 2, 3, 4);
@@ -162,7 +163,6 @@ namespace Tryouts
             //    ["param1"] = (NpgsqlDbType.TimestampTz, dto)
             //});
 
-            //Select(conn, "from Orders as o where o.Company = \"TestCompany\""); 
             //Select(conn, "SELECT * FROM \"Customers\"");
 
             // Select(conn, "from Orders as o where id() = 'orders/829-A' update { o.Freight = \"13.31\"}");
