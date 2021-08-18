@@ -6,6 +6,7 @@ using System.IO.Pipelines;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using PgRvn.Server.Types;
 
 namespace PgRvn.Server.PowerBI
 {
@@ -35,9 +36,9 @@ namespace PgRvn.Server.PowerBI
         {
             return new PgColumn[]
             {
-                new PgColumn("table_schema", 0, PgTypeOIDs.Name, -1, PgFormat.Text),
-                new PgColumn("table_name", 1, PgTypeOIDs.Name, -1, PgFormat.Text),
-                new PgColumn("table_type", 2, PgTypeOIDs.Varchar, -1, PgFormat.Text),
+                new("table_schema", 0, PgName.Default, PgFormat.Text),
+                new("table_name", 1, PgName.Default, PgFormat.Text),
+                new("table_type", 2, PgVarchar.Default, PgFormat.Text),
             };
         }
 

@@ -7,6 +7,7 @@ using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
 using PgRvn.Server.PowerBI;
+using PgRvn.Server.Types;
 using Raven.Client.Documents;
 
 namespace PgRvn.Server

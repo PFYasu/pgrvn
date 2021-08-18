@@ -8,6 +8,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using PgRvn.Server.Types;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Operations;
 using Raven.Client.Documents.Queries;
@@ -98,7 +99,7 @@ namespace PgRvn.Server
                 _result.Includes.Count > 0)
             {
                 _hasId = true;
-                Columns["id()"] = new PgColumn("id()", (short)Columns.Count, PgTypeOIDs.Text, -1, resultsFormat);
+                Columns["id()"] = new PgColumn("id()", (short)Columns.Count, PgText.Default, resultsFormat);
             }
 
             // Go over sample's columns
@@ -114,64 +115,49 @@ namespace PgRvn.Server
                 if (prop.Name == "@metadata")
                     continue;
 
-                var (type, size) = (prop.Token & BlittableJsonReaderBase.TypesMask) switch
+                IPgType pgType = (prop.Token & BlittableJsonReaderBase.TypesMask) switch
                 {
-                    BlittableJsonToken.CompressedString => (PgTypeOIDs.Text, -1),
-                    BlittableJsonToken.String => (PgTypeOIDs.Text, -1),
-                    BlittableJsonToken.Boolean => (PgTypeOIDs.Bool, PgConfig.TrueBuffer.Length),
-                    BlittableJsonToken.EmbeddedBlittable => (PgTypeOIDs.Json, -1),
-                    BlittableJsonToken.Integer => (PgTypeOIDs.Int8, sizeof(long)),
-                    BlittableJsonToken.LazyNumber => (PgTypeOIDs.Float8, sizeof(double)),
-                    BlittableJsonToken.Null => (PgTypeOIDs.Json, -1),
-                    BlittableJsonToken.StartArray => (PgTypeOIDs.Json, -1),
-                    BlittableJsonToken.StartObject => (PgTypeOIDs.Json, -1),
+                    BlittableJsonToken.CompressedString => PgText.Default,
+                    BlittableJsonToken.String => PgText.Default,
+                    BlittableJsonToken.Boolean => PgBool.Default,
+                    BlittableJsonToken.EmbeddedBlittable => PgJson.Default,
+                    BlittableJsonToken.Integer => PgInt8.Default,
+                    BlittableJsonToken.LazyNumber => PgFloat8.Default,
+                    BlittableJsonToken.Null => PgJson.Default,
+                    BlittableJsonToken.StartArray => PgJson.Default,
+                    BlittableJsonToken.StartObject => PgJson.Default,
                     _ => throw new NotSupportedException()
                 };
 
-                string val = (prop.Token & BlittableJsonReaderBase.TypesMask) switch
+                var processedString = (prop.Token & BlittableJsonReaderBase.TypesMask) switch
                 {
                     BlittableJsonToken.CompressedString => (string)prop.Value,
                     BlittableJsonToken.String => (LazyStringValue)prop.Value,
                     _ => null
                 };
 
-                if (val != null && TryConvertStringValue(val, out object output))
+                if (processedString != null && TryConvertStringValue(processedString, out var output))
                 {
-                    switch (output)
+                    pgType = output switch
                     {
-                        case DateTime dt:
-                            size = 8;
-                            type = PgTypeOIDs.Timestamp;
-                            if (dt.Kind == DateTimeKind.Utc)
-                                type = PgTypeOIDs.TimestampTz;
-                            break;
-
-                        case DateTimeOffset:
-                            type = PgTypeOIDs.TimestampTz;
-                            size = 8;
-                            break;
-
-                        case TimeSpan:
-                            type = PgTypeOIDs.Interval;
-                            size = 16;
-                            break;
-                        default:
-                            break;
-                    }
+                        DateTime dt => (dt.Kind == DateTimeKind.Utc) ? PgTimestampTz.Default : PgTimestamp.Default,
+                        DateTimeOffset => PgTimestampTz.Default,
+                        TimeSpan => PgInterval.Default,
+                        _ => pgType
+                    };
                 }
 
-                Columns.TryAdd(prop.Name, new PgColumn(prop.Name, (short)Columns.Count, type, (short)size, resultsFormat, -1));
+                Columns.TryAdd(prop.Name, new PgColumn(prop.Name, (short)Columns.Count, pgType, resultsFormat, -1));
             }
 
             if (Columns.TryGetValue("json()", out var jsonColumn))
             {
-                jsonColumn.TypeObjectId = PgTypeOIDs.Json;
-                jsonColumn.DataTypeSize = -1;
+                jsonColumn.PgType = PgJson.Default;
                 jsonColumn.TypeModifier = -1;
             }
             else
             {
-                Columns["json()"] = new PgColumn("json()", (short)Columns.Count, PgTypeOIDs.Json, -1, resultsFormat);
+                Columns["json()"] = new PgColumn("json()", (short)Columns.Count, PgJson.Default, resultsFormat);
             }
 
             if (_result.Includes.Count != 0)
@@ -180,13 +166,12 @@ namespace PgRvn.Server
 
                 if (Columns.TryGetValue("is_include()", out var includesColumn))
                 {
-                    includesColumn.TypeObjectId = PgTypeOIDs.Bool;
-                    includesColumn.DataTypeSize = 1;
+                    includesColumn.PgType = PgBool.Default;
                     includesColumn.TypeModifier = -1;
                 }
                 else
                 {
-                    Columns["is_include()"] = new PgColumn("is_include()", (short)Columns.Count, PgTypeOIDs.Bool, 1, resultsFormat);
+                    Columns["is_include()"] = new PgColumn("is_include()", (short)Columns.Count, PgBool.Default, resultsFormat);
                 }
             }
 
@@ -299,7 +284,7 @@ namespace PgRvn.Server
                         result.GetPropertyByIndex(index, ref prop);
 
                         byte[] value = null;
-                        switch (prop.Token & BlittableJsonReaderBase.TypesMask, pgColumn.TypeObjectId)
+                        switch (prop.Token & BlittableJsonReaderBase.TypesMask, pgColumn.PgType.Oid)
                         {
                             case (BlittableJsonToken.Boolean, PgTypeOIDs.Bool):
                             case (BlittableJsonToken.CompressedString, PgTypeOIDs.Text):
@@ -308,10 +293,10 @@ namespace PgRvn.Server
                             case (BlittableJsonToken.String, PgTypeOIDs.Text):
                             case (BlittableJsonToken.StartArray, PgTypeOIDs.Json):
                             case (BlittableJsonToken.StartObject, PgTypeOIDs.Json):
-                                value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](prop.Value);
+                                value = PgTypeConverter.ToBytes[(pgColumn.PgType.Oid, pgColumn.FormatCode)](prop.Value);
                                 break;
                             case (BlittableJsonToken.LazyNumber, PgTypeOIDs.Float8):
-                                value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)]((double)(LazyNumberValue) prop.Value);
+                                value = PgTypeConverter.ToBytes[(pgColumn.PgType.Oid, pgColumn.FormatCode)]((double)(LazyNumberValue) prop.Value);
                                 break;
 
                             case (BlittableJsonToken.CompressedString, PgTypeOIDs.Timestamp):
@@ -319,9 +304,9 @@ namespace PgRvn.Server
                             case (BlittableJsonToken.CompressedString, PgTypeOIDs.Interval):
                                 {
                                     if (((string)prop.Value).Length != 0 && 
-                                        TryConvertStringValue((string)prop.Value, out object obj))
+                                        TryConvertStringValue((string)prop.Value, out var obj))
                                     {
-                                        value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](obj);
+                                        value = PgTypeConverter.ToBytes[(pgColumn.PgType.Oid, pgColumn.FormatCode)](obj);
                                     }
                                     break;
                                 }
@@ -336,32 +321,32 @@ namespace PgRvn.Server
                                         // Check for mismatch between column type and our data type
                                         if (obj is DateTime dt)
                                         {
-                                            if (dt.Kind == DateTimeKind.Utc && pgColumn.TypeObjectId != PgTypeOIDs.TimestampTz)
+                                            if (dt.Kind == DateTimeKind.Utc && pgColumn.PgType is not PgTimestampTz)
                                             {
                                                 break;
                                             }
-                                            else if (dt.Kind != DateTimeKind.Utc && pgColumn.TypeObjectId != PgTypeOIDs.Timestamp)
+                                            else if (dt.Kind != DateTimeKind.Utc && pgColumn.PgType is not PgTimestamp)
                                             {
                                                 break;
                                             }
                                         }
 
-                                        if (obj is DateTimeOffset && pgColumn.TypeObjectId != PgTypeOIDs.TimestampTz)
+                                        if (obj is DateTimeOffset && pgColumn.PgType is not PgTimestampTz)
                                         {
                                             break;
                                         }
 
-                                        if (obj is TimeSpan && pgColumn.TypeObjectId != PgTypeOIDs.Interval)
+                                        if (obj is TimeSpan && pgColumn.PgType is not PgInterval)
                                         {
                                             break;
                                         }
 
-                                        value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](obj);
+                                        value = PgTypeConverter.ToBytes[(pgColumn.PgType.Oid, pgColumn.FormatCode)](obj);
                                     }
                                     break;
                                 }
                             case (BlittableJsonToken.String, PgTypeOIDs.Float8):
-                                value = PgTypeConverter.ToBytes[(pgColumn.TypeObjectId, pgColumn.FormatCode)](double.Parse((LazyStringValue)prop.Value));
+                                value = PgTypeConverter.ToBytes[(pgColumn.PgType.Oid, pgColumn.FormatCode)](double.Parse((LazyStringValue)prop.Value));
                                 break;
                             case (BlittableJsonToken.Null, PgTypeOIDs.Json):
                                 value = Array.Empty<byte>();

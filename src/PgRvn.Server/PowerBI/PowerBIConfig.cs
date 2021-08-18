@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using PgRvn.Server.Types;
 
 namespace PgRvn.Server
 {
@@ -20,14 +21,14 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new PgColumn("nspname", 0, PgTypeOIDs.Name, -1, PgFormat.Text),
-                new PgColumn("typname", 1, PgTypeOIDs.Name, -1, PgFormat.Text),
-                new PgColumn("oid", 2, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
-                new PgColumn("typrelid", 3, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
-                new PgColumn("typbasetype", 4, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
-                new PgColumn("type", 5, PgTypeOIDs.Char, sizeof(byte), PgFormat.Text, 1),
-                new PgColumn("elemoid", 6, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
-                new PgColumn("ord", 7, PgTypeOIDs.Int4, sizeof(int), PgFormat.Text),
+                new PgColumn("nspname", 0, PgName.Default, PgFormat.Text),
+                new PgColumn("typname", 1, PgName.Default, PgFormat.Text),
+                new PgColumn("oid", 2, PgOid.Default, PgFormat.Text),
+                new PgColumn("typrelid", 3, PgOid.Default, PgFormat.Text),
+                new PgColumn("typbasetype", 4, PgOid.Default, PgFormat.Text),
+                new PgColumn("type", 5, PgChar.Default, PgFormat.Text, 1),
+                new PgColumn("elemoid", 6, PgOid.Default, PgFormat.Text),
+                new PgColumn("ord", 7, PgInt4.Default, PgFormat.Text),
             },
 
             Data = new List<PgDataRow>
@@ -2393,9 +2394,9 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new PgColumn("oid", 0, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
-                new PgColumn("attname", 1, PgTypeOIDs.Name, -1, PgFormat.Text),
-                new PgColumn("atttypid", 2, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
+                new PgColumn("oid", 0, PgOid.Default, PgFormat.Text),
+                new PgColumn("attname", 1, PgName.Default, PgFormat.Text),
+                new PgColumn("atttypid", 2, PgOid.Default, PgFormat.Text),
             }
         };
 
@@ -2403,8 +2404,8 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new PgColumn("oid", 0, PgTypeOIDs.Oid, sizeof(int), PgFormat.Text),
-                new PgColumn("enumlabel", 1, PgTypeOIDs.Name, -1, PgFormat.Text),
+                new PgColumn("oid", 0, PgOid.Default, PgFormat.Text),
+                new PgColumn("enumlabel", 1, PgName.Default, PgFormat.Text),
             }
         };
 
@@ -2412,12 +2413,12 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new PgColumn("pk_column_name", 0, PgTypeOIDs.Name, 64, PgFormat.Binary),
-                new PgColumn("fk_table_schema", 1, PgTypeOIDs.Name, 64, PgFormat.Binary),
-                new PgColumn("fk_table_name", 2, PgTypeOIDs.Name, 64, PgFormat.Binary),
-                new PgColumn("fk_column_name", 3, PgTypeOIDs.Name, 64, PgFormat.Binary),
-                new PgColumn("ordinal", 4, PgTypeOIDs.Int4, sizeof(int), PgFormat.Binary),
-                new PgColumn("fk_name", 5, PgTypeOIDs.Name, -1, PgFormat.Binary),
+                new PgColumn("pk_column_name", 0, PgName.Default, PgFormat.Binary),
+                new PgColumn("fk_table_schema", 1, PgName.Default, PgFormat.Binary),
+                new PgColumn("fk_table_name", 2, PgName.Default, PgFormat.Binary),
+                new PgColumn("fk_column_name", 3, PgName.Default, PgFormat.Binary),
+                new PgColumn("ordinal", 4, PgInt4.Default, PgFormat.Binary),
+                new PgColumn("fk_name", 5, PgName.Default, PgFormat.Binary),
             }
         };
 
@@ -2425,12 +2426,12 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new PgColumn("pk_table_schema", 0, PgTypeOIDs.Name, 64, PgFormat.Binary),
-                new PgColumn("pk_table_name", 1, PgTypeOIDs.Name, 64, PgFormat.Binary),
-                new PgColumn("pk_column_name", 2, PgTypeOIDs.Name, 64, PgFormat.Binary),
-                new PgColumn("fk_column_name", 3, PgTypeOIDs.Name, 64, PgFormat.Binary),
-                new PgColumn("ordinal", 4, PgTypeOIDs.Int4, sizeof(int), PgFormat.Binary),
-                new PgColumn("fk_name", 5, PgTypeOIDs.Name, -1, PgFormat.Binary),
+                new PgColumn("pk_table_schema", 0, PgName.Default, PgFormat.Binary),
+                new PgColumn("pk_table_name", 1, PgName.Default, PgFormat.Binary),
+                new PgColumn("pk_column_name", 2, PgName.Default, PgFormat.Binary),
+                new PgColumn("fk_column_name", 3, PgName.Default, PgFormat.Binary),
+                new PgColumn("ordinal", 4, PgInt4.Default, PgFormat.Binary),
+                new PgColumn("fk_name", 5, PgName.Default, PgFormat.Binary),
             }
         };
 
@@ -2438,10 +2439,10 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>
             {
-                new PgColumn("index_name", 0, PgTypeOIDs.Text, -1, PgFormat.Binary),
-                new PgColumn("column_name", 1, PgTypeOIDs.Name, 64, PgFormat.Binary),
-                new PgColumn("ordinal_position", 2, PgTypeOIDs.Int4, sizeof(int), PgFormat.Binary),
-                new PgColumn("primary_key", 3, PgTypeOIDs.Text, -1, PgFormat.Binary),
+                new PgColumn("index_name", 0, PgText.Default, PgFormat.Binary),
+                new PgColumn("column_name", 1, PgName.Default, PgFormat.Binary),
+                new PgColumn("ordinal_position", 2, PgInt4.Default, PgFormat.Binary),
+                new PgColumn("primary_key", 3, PgText.Default, PgFormat.Binary),
             }
         };
 
@@ -2449,7 +2450,7 @@ namespace PgRvn.Server
         {
             Columns = new List<PgColumn>()
             {
-                new PgColumn("version", 0, PgTypeOIDs.Text, -1, PgFormat.Text),
+                new PgColumn("version", 0, PgText.Default, PgFormat.Text),
             },
             Data = new List<PgDataRow>
             {

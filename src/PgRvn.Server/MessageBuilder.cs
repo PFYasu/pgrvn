@@ -254,8 +254,8 @@ namespace PgRvn.Server
                 WriteNullTerminatedString(field.Name, Buffer.Span, ref pos);
                 WriteInt32(field.TableObjectId, Buffer.Span, ref pos);
                 WriteInt16(field.ColumnIndex, Buffer.Span, ref pos);
-                WriteInt32(field.TypeObjectId, Buffer.Span, ref pos);
-                WriteInt16(field.DataTypeSize, Buffer.Span, ref pos);
+                WriteInt32(field.PgType.Oid, Buffer.Span, ref pos);
+                WriteInt16(field.PgType.Size, Buffer.Span, ref pos);
                 WriteInt32(field.TypeModifier, Buffer.Span, ref pos);
                 WriteInt16((short)field.FormatCode, Buffer.Span, ref pos);
             }
