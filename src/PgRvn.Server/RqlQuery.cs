@@ -105,7 +105,7 @@ namespace PgRvn.Server
             // Go over sample's columns
             var properties = sample.GetPropertyNames();
             BlittableJsonReaderObject.PropertyDetails prop = default;
-            for (int i = 0; i < properties.Length; i++)
+            for (var i = 0; i < properties.Length; i++)
             {
                 // Using GetPropertyIndex to get the properties in the right order
                 var propIndex = sample.GetPropertyIndex(properties[i]);
@@ -115,7 +115,7 @@ namespace PgRvn.Server
                 if (prop.Name == "@metadata")
                     continue;
 
-                IPgType pgType = (prop.Token & BlittableJsonReaderBase.TypesMask) switch
+                PgType pgType = (prop.Token & BlittableJsonReaderBase.TypesMask) switch
                 {
                     BlittableJsonToken.CompressedString => PgText.Default,
                     BlittableJsonToken.String => PgText.Default,
@@ -272,12 +272,6 @@ namespace PgRvn.Server
 
                     foreach (var (key, pgColumn) in Columns)
                     {
-                        //if (key.Equals("id()", StringComparison.OrdinalIgnoreCase) ||
-                        //    key.Equals("json()", StringComparison.OrdinalIgnoreCase))
-                        //{
-                        //    continue;
-                        //}
-
                         var index = result.GetPropertyIndex(key);
                         if (index == -1)
                             continue;
@@ -293,10 +287,10 @@ namespace PgRvn.Server
                             case (BlittableJsonToken.String, PgTypeOIDs.Text):
                             case (BlittableJsonToken.StartArray, PgTypeOIDs.Json):
                             case (BlittableJsonToken.StartObject, PgTypeOIDs.Json):
-                                value = PgTypeConverter.ToBytes[(pgColumn.PgType.Oid, pgColumn.FormatCode)](prop.Value);
+                                value = pgColumn.PgType.ToBytes(prop.Value, pgColumn.FormatCode);
                                 break;
                             case (BlittableJsonToken.LazyNumber, PgTypeOIDs.Float8):
-                                value = PgTypeConverter.ToBytes[(pgColumn.PgType.Oid, pgColumn.FormatCode)]((double)(LazyNumberValue) prop.Value);
+                                value = pgColumn.PgType.ToBytes((double)(LazyNumberValue)prop.Value, pgColumn.FormatCode);
                                 break;
 
                             case (BlittableJsonToken.CompressedString, PgTypeOIDs.Timestamp):
@@ -306,7 +300,7 @@ namespace PgRvn.Server
                                     if (((string)prop.Value).Length != 0 && 
                                         TryConvertStringValue((string)prop.Value, out var obj))
                                     {
-                                        value = PgTypeConverter.ToBytes[(pgColumn.PgType.Oid, pgColumn.FormatCode)](obj);
+                                        value = pgColumn.PgType.ToBytes(obj, pgColumn.FormatCode);
                                     }
                                     break;
                                 }
@@ -341,12 +335,12 @@ namespace PgRvn.Server
                                             break;
                                         }
 
-                                        value = PgTypeConverter.ToBytes[(pgColumn.PgType.Oid, pgColumn.FormatCode)](obj);
+                                        value = pgColumn.PgType.ToBytes(obj, pgColumn.FormatCode);
                                     }
                                     break;
                                 }
                             case (BlittableJsonToken.String, PgTypeOIDs.Float8):
-                                value = PgTypeConverter.ToBytes[(pgColumn.PgType.Oid, pgColumn.FormatCode)](double.Parse((LazyStringValue)prop.Value));
+                                value = pgColumn.PgType.ToBytes(double.Parse((LazyStringValue)prop.Value), pgColumn.FormatCode);
                                 break;
                             case (BlittableJsonToken.Null, PgTypeOIDs.Json):
                                 value = Array.Empty<byte>();
@@ -369,7 +363,7 @@ namespace PgRvn.Server
 
                     if (_hasIncludes)
                     {
-                        row[includesIndex] = PgConfig.FalseBuffer;
+                        row[includesIndex] = PgBool.FalseBuffer;
                     }
                     await writer.WriteAsync(builder.DataRow(row[..Columns.Count]), token);
                 }
@@ -382,7 +376,7 @@ namespace PgRvn.Server
 
                     row[idIndex] = Encoding.UTF8.GetBytes(prop.Name);
                     row[jsonIndex] = Encoding.UTF8.GetBytes(prop.Value.ToString());
-                    row[includesIndex] = PgConfig.TrueBuffer;
+                    row[includesIndex] = PgBool.TrueBuffer;
                     await writer.WriteAsync(builder.DataRow(row[..Columns.Count]), token);
                 }
             }

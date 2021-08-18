@@ -14,27 +14,25 @@ namespace PgRvn.Server.PowerBI
 {
     public class PBIPreviewQuery : RqlQuery
     {
-        public string _tableName;
-        private List<PgDataRow> _results;
-        private static readonly Regex _regex = new Regex(@"(?is)^\s*select\s+.*\s+from\s+INFORMATION_SCHEMA.columns\s+where\s+TABLE_SCHEMA\s+=\s+'public'\s+and\s+TABLE_NAME\s*=\s*'(?<table_name>[^']+)'\s+order\s+by\s+TABLE_SCHEMA\s*,\s*TABLE_NAME\s*,\s*ORDINAL_POSITION\s*$",
+        private readonly List<PgDataRow> _results;
+        private static readonly Regex SqlRegex = new Regex(@"(?is)^\s*select\s+.*\s+from\s+INFORMATION_SCHEMA.columns\s+where\s+TABLE_SCHEMA\s+=\s+'public'\s+and\s+TABLE_NAME\s*=\s*'(?<table_name>[^']+)'\s+order\s+by\s+TABLE_SCHEMA\s*,\s*TABLE_NAME\s*,\s*ORDINAL_POSITION\s*$",
             RegexOptions.Compiled);
 
-        public PBIPreviewQuery(int[] parametersDataTypes, IDocumentStore documentStore, string tableName) 
-            : base($"from {tableName} limit 1", parametersDataTypes, documentStore)
+        public PBIPreviewQuery(IDocumentStore documentStore, string tableName) 
+            : base($"from {tableName} limit 1", Array.Empty<int>(), documentStore)
         {
-            _tableName = tableName;
             _results = new List<PgDataRow>();
         }
 
-        public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out PgQuery pgQuery)
+        public static bool TryParse(string queryText, IDocumentStore documentStore, out PgQuery pgQuery)
         {
-            var match = _regex.Match(queryText);
+            var match = SqlRegex.Match(queryText);
 
             if (match.Success)
             {
                 var tableName = match.Groups["table_name"].Value;
 
-                pgQuery = new PBIPreviewQuery(parametersDataTypes, documentStore, tableName);
+                pgQuery = new PBIPreviewQuery(documentStore, tableName);
                 return true;
             }
 
@@ -52,7 +50,7 @@ namespace PgRvn.Server.PowerBI
             await writer.WriteAsync(builder.CommandComplete($"SELECT {_results.Count}"), token);
         }
 
-        public override void Bind(IEnumerable<byte[]> parameters, short[] parameterFormatCodes, short[] resultColumnFormatCodes)
+        public override void Bind(ICollection<byte[]> parameters, short[] parameterFormatCodes, short[] resultColumnFormatCodes)
         {
             // Note: We don't call base.Bind(..) because we only support parameters for this custom RQL, not the original SQL
 

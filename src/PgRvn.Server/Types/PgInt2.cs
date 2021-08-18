@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 
 namespace PgRvn.Server.Types
 {
-    public class PgInt4 : PgType
+    public class PgInt2 : PgType
     {
-        public static readonly PgInt4 Default = new();
-        public override int Oid => PgTypeOIDs.Int4;
-        public override short Size => sizeof(int);
-        public override int TypeModifier => -1;
+        public static readonly PgInt2 Default = new();
+        public override int Oid => PgTypeOIDs.Int2;
+        public override short Size => sizeof(short);
+        public override int TypeModifier { get; }
 
         public override byte[] ToBytes(object value, PgFormat formatCode)
         {
@@ -21,17 +21,17 @@ namespace PgRvn.Server.Types
                 return Utf8GetBytes(value);
             }
 
-            return BitConverter.GetBytes(IPAddress.HostToNetworkOrder((int)value));
+            return BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short)value));
         }
 
         public override object FromBytes(byte[] buffer, PgFormat formatCode)
         {
             if (formatCode == PgFormat.Text)
             {
-                return int.Parse(Utf8GetString(buffer));
+                return short.Parse(Utf8GetString(buffer));
             }
 
-            return IPAddress.NetworkToHostOrder(BitConverter.ToInt32(buffer));
+            return IPAddress.NetworkToHostOrder(BitConverter.ToInt16(buffer));
         }
     }
 }

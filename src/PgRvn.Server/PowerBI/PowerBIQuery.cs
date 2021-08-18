@@ -26,7 +26,7 @@ namespace PgRvn.Server.PowerBI
                 return true;
             }
 
-            if (PBIPreviewQuery.TryParse(queryText, parametersDataTypes, documentStore, out pgQuery))
+            if (PBIPreviewQuery.TryParse(queryText, documentStore, out pgQuery))
             {
                 return true;
             }
