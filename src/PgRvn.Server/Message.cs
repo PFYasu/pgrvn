@@ -81,16 +81,14 @@ namespace PgRvn.Server
         /// </summary>
         public short ColumnIndex;
         public PgType PgType;
-        public int TypeModifier;
         public PgFormat FormatCode;
 
-        public PgColumn(string name, short columnIndex, PgType pgType, PgFormat formatCode, int typeModifier = -1, int tableOid = 0)
+        public PgColumn(string name, short columnIndex, PgType pgType, PgFormat formatCode, int tableOid = 0)
         {
             Name = name;
             TableObjectId = tableOid;
             ColumnIndex = columnIndex;
             PgType = pgType;
-            TypeModifier = typeModifier;
             FormatCode = formatCode;
         }
     }

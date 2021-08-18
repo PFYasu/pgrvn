@@ -256,7 +256,7 @@ namespace PgRvn.Server
                 WriteInt16(field.ColumnIndex, Buffer.Span, ref pos);
                 WriteInt32(field.PgType.Oid, Buffer.Span, ref pos);
                 WriteInt16(field.PgType.Size, Buffer.Span, ref pos);
-                WriteInt32(field.TypeModifier, Buffer.Span, ref pos);
+                WriteInt32(field.PgType.TypeModifier, Buffer.Span, ref pos);
                 WriteInt16((short)field.FormatCode, Buffer.Span, ref pos);
             }
 

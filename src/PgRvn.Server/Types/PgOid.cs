@@ -26,7 +26,12 @@ namespace PgRvn.Server.Types
 
         public override object FromBytes(byte[] buffer, PgFormat formatCode)
         {
-            throw new NotImplementedException(); // TODO
+            if (formatCode == PgFormat.Text)
+            {
+                return int.Parse(Utf8GetString(buffer));
+            }
+
+            return IPAddress.NetworkToHostOrder(BitConverter.ToInt32(buffer));
         }
     }
 }

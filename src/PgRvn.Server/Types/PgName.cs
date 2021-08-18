@@ -11,9 +11,16 @@ namespace PgRvn.Server.Types
         public static readonly PgName Default = new();
         public override int Oid => PgTypeOIDs.Name;
         public override short Size => 64;
+        public override int TypeModifier => -1;
+
         public override byte[] ToBytes(object value, PgFormat formatCode)
         {
             return Utf8GetBytes(value);
+        }
+
+        public override object FromBytes(byte[] buffer, PgFormat formatCode)
+        {
+            return Utf8GetString(buffer);
         }
     }
 }

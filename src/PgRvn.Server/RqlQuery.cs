@@ -153,7 +153,6 @@ namespace PgRvn.Server
             if (Columns.TryGetValue("json()", out var jsonColumn))
             {
                 jsonColumn.PgType = PgJson.Default;
-                jsonColumn.TypeModifier = -1;
             }
             else
             {
@@ -167,7 +166,6 @@ namespace PgRvn.Server
                 if (Columns.TryGetValue("is_include()", out var includesColumn))
                 {
                     includesColumn.PgType = PgBool.Default;
-                    includesColumn.TypeModifier = -1;
                 }
                 else
                 {
