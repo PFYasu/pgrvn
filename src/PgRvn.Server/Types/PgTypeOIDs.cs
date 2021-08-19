@@ -18,7 +18,7 @@
     OR MODIFICATIONS.
  */
 
-namespace PgRvn.Server
+namespace PgRvn.Server.Types
 {
     /// <summary>
     /// Holds well-known, built-in PostgreSQL type OIDs.

@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO.Pipelines;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using PgRvn.Server.Exceptions;
 using PgRvn.Server.Types;
 
-namespace PgRvn.Server
+namespace PgRvn.Server.Messages
 {
     public enum MessageType : byte
     {
@@ -126,84 +129,27 @@ namespace PgRvn.Server
 
     public abstract class Message
     {
-    }
+        public virtual async Task Handle(Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
+        {
+            try
+            {
+                await HandleMessage(transaction, messageBuilder, writer, token);
+            }
+            catch (PgErrorException e)
+            {
+                await HandleError(e, transaction, messageBuilder, writer, token);
+            }
+        }
 
-    public class Parse : Message
-    {
-        public string StatementName;
-        public string Query;
+        protected abstract Task HandleMessage(Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token);
 
-        /// <summary>
-        /// Object ID number of parameter data types specified (can be zero).
-        /// </summary>
-        /// <remarks>
-        /// Note that this is not an indication of the number of parameters that might appear
-        /// in the query string, only the number that the frontend wants to prespecify types for.
-        /// </remarks>
-        public int[] ParametersDataTypes;
-    }
-
-    public class Bind : Message
-    {
-        public string PortalName;
-        public string StatementName;
-        public short[] ParameterFormatCodes;
-        public List<byte[]> Parameters;
-        public short[] ResultColumnFormatCodes;
-    }
-
-    public class Describe : Message
-    {
-
-        /// <summary>
-        /// Type of Postgres object to describe (Portal/Statement)
-        /// </summary>
-        public PgObjectType PgObjectType;
-        public string ObjectName;
-    }
-
-    public class Execute : Message
-    {
-        public string PortalName;
-        public int MaxRows;
-    }
-
-    public class Sync : Message
-    {
-    }
-
-    public class Terminate : Message
-    {
-    }
-
-    public class StartupMessage : Message
-    {
-        public ProtocolVersion ProtocolVersion;
-        public Dictionary<string, string> ClientOptions;
-    }
-
-    public class Cancel : Message
-    {
-        public int ProcessId;
-        public int SessionId;
-    }
-
-    public class SSLRequest : Message
-    {
-    }
-
-    public class Query : Message
-    {
-        public string QueryString;
-    }
-
-    public class Close : Message
-    {
-        public PgObjectType PgObjectType;
-        public string ObjectName;
-    }
-
-    public class Flush : Message
-    {
+        public virtual async Task HandleError(PgErrorException e, Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token) 
+        {
+            await writer.WriteAsync(messageBuilder.ErrorResponse(
+                            PgSeverity.Error,
+                            e.ErrorCode,
+                            e.Message,
+                            e.ToString()), token);
+        }
     }
 }

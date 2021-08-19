@@ -1,19 +1,21 @@
-﻿using System;
+﻿using PgRvn.Server.Messages;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using PgRvn.Server.Messages;
 
 namespace PgRvn.Server.Types
 {
     public class PgBool : PgType
     {
         public static readonly PgBool Default = new();
-        public static byte[] TrueBuffer = { 1 }, FalseBuffer = { 0 };
-
         public override int Oid => PgTypeOIDs.Bool;
         public override short Size => sizeof(byte);
         public override int TypeModifier => -1;
+        
+        public static byte[] TrueBuffer = { 1 }, FalseBuffer = { 0 };
 
         public override byte[] ToBytes(object value, PgFormat formatCode)
         {

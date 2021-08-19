@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace PgRvn.Server
+namespace PgRvn.Server.Exceptions
 {
     public class PgFatalException : Exception
     {

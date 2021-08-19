@@ -8,6 +8,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using PgRvn.Server.Messages;
 using PgRvn.Server.Types;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Operations;

@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using PgRvn.Server.PowerBI;
 using PgRvn.Server.Types;
 using Raven.Client.Documents;
+using PgRvn.Server.Messages;
+using PgRvn.Server.Exceptions;
 
 namespace PgRvn.Server
 {

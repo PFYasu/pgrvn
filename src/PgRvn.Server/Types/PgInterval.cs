@@ -5,6 +5,7 @@ using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using PgRvn.Server.Messages;
 
 namespace PgRvn.Server.Types
 {
