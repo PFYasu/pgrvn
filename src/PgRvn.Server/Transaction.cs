@@ -52,7 +52,6 @@ namespace PgRvn.Server
         public async Task Execute(MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
             await _currentQuery.Execute(messageBuilder, writer, token);
-            // TODO: Remove this comment once confirmed working - State = TransactionState.Idle;
         }
 
         public void Fail()
