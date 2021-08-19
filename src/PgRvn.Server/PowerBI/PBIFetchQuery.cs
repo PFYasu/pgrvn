@@ -154,8 +154,7 @@ namespace PgRvn.Server.PowerBI
             }
 
             var limit = matches[0].Groups["limit"];
-
-            Console.WriteLine(">> RQL:\n" + newRql + "\n");
+            
             pgQuery = new RqlQuery(newRql, parametersDataTypes, documentStore, limit.Success ? int.Parse(limit.Value) : null);
             return true;
         }

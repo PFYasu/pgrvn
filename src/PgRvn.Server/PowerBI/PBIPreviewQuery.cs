@@ -16,6 +16,11 @@ namespace PgRvn.Server.PowerBI
     public class PBIPreviewQuery : RqlQuery
     {
         private readonly List<PgDataRow> _results;
+        
+        /// <summary>
+        /// Matches PowerBI's query that's responsible for retreiving information about a table it wants to preview.
+        /// Sent when selecting a table in PowerBI's GUI
+        /// </summary>
         private static readonly Regex SqlRegex = new Regex(@"(?is)^\s*select\s+.*\s+from\s+INFORMATION_SCHEMA.columns\s+where\s+TABLE_SCHEMA\s+=\s+'public'\s+and\s+TABLE_NAME\s*=\s*'(?<table_name>[^']+)'\s+order\s+by\s+TABLE_SCHEMA\s*,\s*TABLE_NAME\s*,\s*ORDINAL_POSITION\s*$",
             RegexOptions.Compiled);
 
@@ -70,10 +75,10 @@ namespace PgRvn.Server.PowerBI
                 {
                     ColumnData = new ReadOnlyMemory<byte>?[]
                     {
-                            Encoding.UTF8.GetBytes(column.Name), // column_name
-                            BitConverter.GetBytes(IPAddress.HostToNetworkOrder(i)), // ordinal_position
-                            Encoding.UTF8.GetBytes("YES"), // is_nullable
-                            Encoding.UTF8.GetBytes(""), // data_type - easier to leave empty for us
+                        Encoding.UTF8.GetBytes(column.Name), // column_name
+                        BitConverter.GetBytes(IPAddress.HostToNetworkOrder(i)), // ordinal_position
+                        Encoding.UTF8.GetBytes("YES"), // is_nullable
+                        Encoding.UTF8.GetBytes(""), // data_type - easier to leave empty for us
                     }
                 });
                 i++;
