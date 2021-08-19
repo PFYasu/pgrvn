@@ -9,16 +9,34 @@ namespace PgRvn.Server.PowerBI
 {
     public static class PBIFetchQuery
     {
+        /// <summary>
+        /// Match an SQL from PowerBI that intends to query a collection. The SQL query may be nested and 
+        /// may also have a nested RQL query.
+        /// </summary>
         private static readonly Regex FetchSqlRegex = new(@"(?is)^\s*(?:select\s+(?:\*|(?:(?:(?:""(\$Table|_)""\.)?""(?<src_columns>[^""]+)""(?:\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")?(?<replace>)|(?<replace>replace)\(""_"".""(?<src_columns>[^""]+)"",\s+'(?<replace_inputs>[^']*)',\s+'(?<replace_texts>[^']*)'\)\s+as\s+""(?<all_columns>(?<dest_columns>[^""]+))"")(?:\s|,)*)+)\s+from\s+(?:(?:\((?:\s|,)*)(?<inner_query>.*)\s*\)|""public"".""(?<table_name>.+)""))\s+""(?:\$Table|_)""(\s+where\s+(?<where>.*?))?(?:\s+limit\s+(?<limit>[0-9]+))?\s*$",
             RegexOptions.Compiled);
 
+        /// <summary>
+        /// Match the RQL found in the original SQL query. Used to modify the RQL query using information from the outer SQL.
+        /// </summary>
         private static readonly Regex RqlRegex = new(@"^(?is)\s*(?<rql>(?:/\*rql\*/\s*)?from\s+(?<collection>[^\s\(\)]+)(?:\s+as\s+(?<alias>\S+))?.*?(?<select>\s+select\s+((?<js_select>({\s*(?<js_fields>(?<js_keys>.+?)(\s*:\s*((?<js_vals>.+?))|(?<js_vals>))\s*,\s*)*(?<js_fields>(?<js_keys>.+?)((\s*:\s*(?<js_vals>.+?))|(?<js_vals>))\s*)}))|(?<simple_select>((?<simple_keys>.+?)\s*,\s*)*(((?<simple_keys>\S+)|(?<simple_keys>"".* ""))(\s*as\s*(\S+|"".* "")\s*)?))))?(?:\s+include\s+(?<include>.*))?\s*)$",
             RegexOptions.Compiled);
 
+        /// <summary>
+        /// Match the column names found in the SQL where clause. 
+        /// Used to integrate the column names into the where clause of the RQL query.
+        /// </summary>
         private static readonly Regex WhereColumnRegex = new(@"""_""\.""(?<column>.*?)""", RegexOptions.Compiled);
 
+        /// <summary>
+        /// Match operators found in the SQL where clause. 
+        /// Used to integrate the where clause into the RQL query.
+        /// </summary>
         private static readonly Regex WhereOperatorRegex = new(@"(?=.*?\s+)is(\s+not)?(?=\s+.+?)", RegexOptions.Compiled);
 
+        /// <summary>
+        /// Map of operators from PostgreSQL to RQL
+        /// </summary>
         private static readonly Dictionary<string, string> OperatorMap = new(StringComparer.OrdinalIgnoreCase)
         {
             { "is", "=" },
