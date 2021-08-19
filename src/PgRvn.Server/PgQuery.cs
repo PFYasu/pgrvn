@@ -36,8 +36,6 @@ namespace PgRvn.Server
 
         public static PgQuery CreateInstance(string queryText, int[] parametersDataTypes, IDocumentStore documentStore)
         {
-            Console.WriteLine(">> Received query:\n" + queryText + "\n");
-
             if (RqlQuery.TryParse(queryText, parametersDataTypes, documentStore, out var rqlQuery))
             {
                 return rqlQuery;

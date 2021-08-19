@@ -384,6 +384,8 @@ namespace PgRvn.Server.Messages
         private byte[] ReadBytes(ReadOnlySequence<byte> readBuffer, PipeReader reader, int length)
         {
             var sequence = readBuffer.Slice(0, length);
+
+            var buffer2 = ArrayPool<byte>.Shared.Rent(length);
             var buffer = new byte[length];
             sequence.CopyTo(buffer);
             reader.AdvanceTo(sequence.End);

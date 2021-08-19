@@ -61,7 +61,6 @@ namespace PgRvn.Server
                 catch (Exception e)
                 {
                     // TODO: error handling here
-                    Console.WriteLine(e);
                     throw;
                 }
 
@@ -77,9 +76,9 @@ namespace PgRvn.Server
                     _processId);
                 await session.Run();
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                Console.WriteLine(e);
+                // TODO: Error handling
             }
         }
     }
