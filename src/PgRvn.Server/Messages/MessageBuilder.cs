@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PgRvn.Server
+namespace PgRvn.Server.Messages
 {
     public class MessageBuilder : IDisposable
     {

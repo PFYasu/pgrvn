@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PgRvn.Server.Exceptions;
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO.Pipelines;
@@ -9,11 +10,11 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PgRvn.Server
+namespace PgRvn.Server.Messages
 {
     public class MessageReader
     {
-        public async Task<Message> ReadInitialMessage(PipeReader reader, CancellationToken token)
+        public async Task<IInitialMessage> ReadInitialMessage(PipeReader reader, CancellationToken token)
         {
             var msgLen = await ReadInt32Async(reader, token) - sizeof(int);
             var protocolVersion = await ReadInt32Async(reader, token);

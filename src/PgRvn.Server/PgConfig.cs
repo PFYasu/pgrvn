@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using PgRvn.Server.Messages;
 using PgRvn.Server.Types;
 
 namespace PgRvn.Server

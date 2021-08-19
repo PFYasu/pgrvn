@@ -1,4 +1,6 @@
-﻿using System;
+﻿using PgRvn.Server.Exceptions;
+using PgRvn.Server.Messages;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,18 +13,9 @@ namespace PgRvn.Server.Types
         public abstract int Oid { get; }
         public abstract short Size { get; }
         public abstract int TypeModifier { get; }
+
         public abstract byte[] ToBytes(object value, PgFormat formatCode);
         public abstract object FromBytes(byte[] buffer, PgFormat formatCode);
-
-        protected byte[] Utf8GetBytes(object value)
-        {
-            return Encoding.UTF8.GetBytes(value.ToString() ?? string.Empty);
-        }
-
-        protected string Utf8GetString(byte[] buffer)
-        {
-            return Encoding.UTF8.GetString(buffer);
-        }
 
         public static PgType Parse(int dataType) // todo: int typeModifier
         {
@@ -45,6 +38,42 @@ namespace PgRvn.Server.Types
                 PgTypeOIDs.Varchar => PgVarchar.Default,
                 _ => PgUnknown.Default
             };
+        }
+
+        public static PgType Parse(string dataType)
+        {
+            // TODO: Make sure these are the actual possible strings of each type
+            return dataType switch
+            {
+                "bool" => PgBool.Default,
+                "bytea" => PgBytea.Default,
+                "char" => PgChar.Default,
+                "float8" => PgFloat8.Default,
+                "int2" => PgInt2.Default,
+                "int4" => PgInt4.Default,
+                "int8" => PgInt8.Default,
+                "interval" => PgInterval.Default,
+                "json" => PgJson.Default,
+                "name" => PgName.Default,
+                "oid" => PgOid.Default,
+                "text" => PgText.Default,
+                "timestamp" => PgTimestamp.Default,
+                "timestamptz" => PgTimestampTz.Default,
+                "varchar" => PgVarchar.Default,
+                _ => throw new PgErrorException(PgErrorCodes.AmbiguousParameter,
+                                "Couldn't determine parameter type, try explicitly providing it in your query " +
+                                "(e.g. from Orders where Freight = $1::double)")
+            };
+        }
+        
+        protected byte[] Utf8GetBytes(object value)
+        {
+            return Encoding.UTF8.GetBytes(value.ToString() ?? string.Empty);
+        }
+
+        protected string Utf8GetString(byte[] buffer)
+        {
+            return Encoding.UTF8.GetString(buffer);
         }
     }
 }

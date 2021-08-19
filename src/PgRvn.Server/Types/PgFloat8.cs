@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Sparrow.Json;
+using PgRvn.Server.Messages;
 
 namespace PgRvn.Server.Types
 {

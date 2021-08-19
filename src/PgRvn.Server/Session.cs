@@ -1,4 +1,6 @@
-﻿using Raven.Client.Documents;
+﻿using PgRvn.Server.Exceptions;
+using PgRvn.Server.Messages;
+using Raven.Client.Documents;
 using System;
 using System.Collections.Generic;
 using System.IO.Pipelines;
@@ -99,39 +101,8 @@ namespace PgRvn.Server
 
                 while (_token.IsCancellationRequested == false)
                 {
-                    var message = await messageReader.ReadMessage(reader, _token);
-
-                    if (message is Terminate)
-                        break;
-
-                    if (transaction.State == TransactionState.Failed && message is not Sync)
-                        continue;
-
-                    try
-                    {
-                        var response = message switch
-                        {
-                            Parse parse => transaction.Parse(parse, messageBuilder),
-                            Bind bind => transaction.Bind(bind, messageBuilder),
-                            Sync => transaction.Sync(messageBuilder),
-                            Describe describe => await transaction.Describe(describe, messageBuilder, writer, _token),
-                            Execute => await transaction.Execute(messageBuilder, writer, _token),
-                            Query query => await transaction.Query(query, messageBuilder, writer, _token),
-                            Close close => transaction.Close(close, messageBuilder),
-                            Flush => await transaction.Flush(writer, _token),
-                            _ => throw new PgFatalException(PgErrorCodes.ProtocolViolation, "Unrecognized message type")
-                        };
-
-                        await writer.WriteAsync(response, _token);
-                    }
-                    catch (PgErrorException e)
-                    {
-                        await writer.WriteAsync(messageBuilder.ErrorResponse(
-                            PgSeverity.Error,
-                            e.ErrorCode,
-                            e.Message,
-                            e.ToString()), _token);
-                    }
+                    Message message = await messageReader.ReadMessage(reader, _token);
+                    await message.Handle(transaction, messageBuilder, writer, _token);
                 }
             }
             catch (PgFatalException e)
@@ -141,6 +112,9 @@ namespace PgRvn.Server
                     e.ErrorCode,
                     e.Message,
                     e.ToString()), _token);
+            }
+            catch (PgTerminateReceivedException)
+            {
             }
             catch (Exception e)
             {

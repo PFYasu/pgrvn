@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using PgRvn.Server.Messages;
 using PgRvn.Server.Types;
 
 namespace PgRvn.Server

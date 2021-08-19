@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using PgRvn.Server.Types;
+using PgRvn.Server.Messages;
 
 namespace PgRvn.Server.PowerBI
 {

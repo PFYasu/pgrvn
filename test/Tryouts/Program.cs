@@ -79,9 +79,9 @@ namespace Tryouts
             // SELECT * FROM Customers WHERE field = $1
 
             var cmd = conn.CreateCommand();
-            //cmd.CommandText = "SELECT ? from \"Customers\"";
+            cmd.CommandText = "from Employees select FirstName limit 2";
             //cmd.CommandText = "from Products where Discontinued = ?";
-            cmd.CommandText = "from Orders where OrderedAtUtc = ?::timestamptz";
+            //cmd.CommandText = "from Orders where OrderedAtUtc = ?";
             //cmd.CommandText = "from index 'Stocks_ByTradeVolume' as f where f.Company = 'Alfreds Futterkiste' select { adv: new Date(f.Date).toJSON() }";
             // from Products where Discontinued = $1::int8
             // Parse - ParameterType - 25
@@ -94,7 +94,7 @@ namespace Tryouts
             //cmd.Parameters.Add("@Bit", OdbcType.Bit).Value = false;
             //cmd.Parameters.Add("@Char", OdbcType.Char).Value = 'a';
             //cmd.Parameters.Add("@Date", OdbcType.Date).Value = new DateTime(2000, 1, 1);
-            cmd.Parameters.Add("@DateTime", OdbcType.DateTime).Value = DateTime.Parse("1998-05-05T01:02:03.0405060Z"); //.0405060Z
+            //cmd.Parameters.Add("@DateTime", OdbcType.DateTime).Value = DateTime.Parse("1998-05-05T01:02:03.0405060Z"); //.0405060Z
             //cmd.Parameters.Add("@Decimal", OdbcType.Decimal).Value = (decimal)15.3;
             //cmd.Parameters.Add("@Double", OdbcType.Double).Value = (double)123.123123;
             //cmd.Parameters.Add("@Image", OdbcType.Image).Value = new byte[] { 0x1, 0x2, 0x3, 0x4 };
@@ -147,14 +147,14 @@ namespace Tryouts
             }
 
 
-            //InitODBC();
+            InitODBC();
 
-            Console.ReadLine();
+            //Console.ReadLine();
 
             //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
-            var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
+            //var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
             //using var conn = new NpgsqlConnection(connString); conn.Open();
-            //Select(conn, "from Orders as o where o.Company = \"TestCompany\""); 
+            //Select(conn, "from Orders"); 
 
             //var dto = DateTime.Parse("1998-05-05T01:02:03.0405060Z");
             ////var dto = new TimeSpan(1, 2, 3, 4);
