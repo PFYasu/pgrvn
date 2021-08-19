@@ -16,7 +16,7 @@ namespace PgRvn.Server.Messages
 
         public MessageBuilder()
         {
-            _bufferOwner = MemoryPool<byte>.Shared.Rent(32*1024); // TODO: need to manage sizes here
+            _bufferOwner = MemoryPool<byte>.Shared.Rent(32*1024);
         }
 
         public ReadOnlyMemory<byte> ReadyForQuery(TransactionState transactionState)

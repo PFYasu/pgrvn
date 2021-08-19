@@ -98,7 +98,7 @@ namespace PgRvn.Server.Messages
                     break;
 
                 case (byte)MessageType.Bind:
-                    (message, bytesRead) = await ReadBind(reader, token);
+                    (message, bytesRead) = await ReadBind(reader, token, msgLen);
                     break;
 
                 case (byte)MessageType.Describe:
@@ -168,7 +168,7 @@ namespace PgRvn.Server.Messages
             }, len);
         }
 
-        private async Task<(Bind, int)> ReadBind(PipeReader reader, CancellationToken token)
+        private async Task<(Bind, int)> ReadBind(PipeReader reader, CancellationToken token, int msgLen)
         {
             int len = 0;
 
@@ -197,7 +197,15 @@ namespace PgRvn.Server.Messages
                 var parameterLength = await ReadInt32Async(reader, token);
                 len += sizeof(int);
 
-                // TODO: Is it okay to allocate up to 2GB of data based on external output?
+                // Limit parameter size to 1MB
+                if (parameterLength > 1 * 1024 * 1024)
+                {
+                    // Skip to end of message to stay in sync
+                    await SkipBytesAsync(reader, token, msgLen - len);
+                    throw new PgErrorException(PgErrorCodes.InvalidParameterValue,
+                        $"Parameter too big, expected 1MB or less but got size of '{parameterLength}'");
+                }
+
                 parameters.Add(await ReadBytesAsync(reader, parameterLength, token));
                 len += parameterLength;
             }
@@ -359,6 +367,18 @@ namespace PgRvn.Server.Messages
         {
             var read = await ReadMinimumOf(reader, sizeof(byte), token);
             return ReadByte(read.Buffer, reader);
+        }
+
+        private async Task SkipBytesAsync(PipeReader reader, CancellationToken token, int length)
+        {
+            var read = await ReadMinimumOf(reader, length, token);
+            SkipBytes(read.Buffer, reader, length);
+        }
+
+        private void SkipBytes(ReadOnlySequence<byte> readBuffer, PipeReader reader, int length)
+        {
+            var sequence = readBuffer.Slice(0, length);
+            reader.AdvanceTo(sequence.End);
         }
 
         private byte[] ReadBytes(ReadOnlySequence<byte> readBuffer, PipeReader reader, int length)

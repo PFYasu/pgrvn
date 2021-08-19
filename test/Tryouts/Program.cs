@@ -79,7 +79,7 @@ namespace Tryouts
             // SELECT * FROM Customers WHERE field = $1
 
             var cmd = conn.CreateCommand();
-            cmd.CommandText = "from Employees select FirstName limit 2";
+            cmd.CommandText = "from Employees where FirstName = ?::text select FirstName limit 2";
             //cmd.CommandText = "from Products where Discontinued = ?";
             //cmd.CommandText = "from Orders where OrderedAtUtc = ?";
             //cmd.CommandText = "from index 'Stocks_ByTradeVolume' as f where f.Company = 'Alfreds Futterkiste' select { adv: new Date(f.Date).toJSON() }";
@@ -106,7 +106,7 @@ namespace Tryouts
             //cmd.Parameters.Add("@Real", OdbcType.Real).Value = (float)13.37;
             //cmd.Parameters.Add("@SmallDateTime", OdbcType.SmallDateTime).Value = new DateTime(2000, 3, 3);
             //cmd.Parameters.Add("@SmallInt", OdbcType.SmallInt).Value = (short)2;
-            //cmd.Parameters.Add("@Text", OdbcType.Text).Value = "Hello World";
+            cmd.Parameters.Add("@Text", OdbcType.Text).Value = "Anne";
             //cmd.Parameters.Add("@Time", OdbcType.Time).Value = new TimeSpan(1, 1, 1, 1);
             //cmd.Parameters.Add("@Timestamp", OdbcType.Timestamp).Value = new byte[] { 0x42, 0x43 };
             //cmd.Parameters.Add("@TinyInt", OdbcType.TinyInt).Value = 0x1;
