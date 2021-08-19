@@ -105,6 +105,14 @@ namespace PgRvn.Server
                     await message.Handle(transaction, messageBuilder, writer, _token);
                 }
             }
+            catch (PgErrorException e)
+            {
+                await writer.WriteAsync(messageBuilder.ErrorResponse(
+                    PgSeverity.Error,
+                    e.ErrorCode,
+                    e.Message,
+                    e.ToString()), _token);
+            }
             catch (PgFatalException e)
             {
                 await writer.WriteAsync(messageBuilder.ErrorResponse(
