@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using PgRvn.Server.Messages;
+using PgRvn.Server.Npgsql;
 using PgRvn.Server.Types;
 using TSQL;
 
@@ -39,13 +40,18 @@ namespace PgRvn.Server
                 return;
             }
 
-            if (normalizedQuery.StartsWith(PowerBIConfig.CompositeTypesQuery, StringComparison.OrdinalIgnoreCase))
+            // Npgsql & PowerBI send this
+            // TODO: Figure out which versions of npgsql send this
+            // 4.1.1
+            if (normalizedQuery.StartsWith(NpgsqlConfig.CompositeTypesQuery, StringComparison.OrdinalIgnoreCase))
             {
                 _result = PowerBIConfig.CompositeTypesResponse;
                 return;
             }
 
-            if (normalizedQuery.Equals(PowerBIConfig.EnumTypesQuery, StringComparison.OrdinalIgnoreCase))
+            // Npgsql & PowerBI send this
+            // 4.1.1, 4.0.0
+            if (normalizedQuery.Equals(NpgsqlConfig.EnumTypesQuery, StringComparison.OrdinalIgnoreCase))
             {
                 _result = PowerBIConfig.EnumTypesResponse;
                 return;
@@ -69,15 +75,63 @@ namespace PgRvn.Server
                 return;
             }
 
-            if (normalizedQuery.Equals(PowerBIConfig.VersionQuery, StringComparison.OrdinalIgnoreCase))
-            {
-                _result = PowerBIConfig.VersionResponse;
-                return;
-            }
-
             if (normalizedQuery.Equals(PowerBIConfig.CharacterSetsQuery, StringComparison.OrdinalIgnoreCase))
             {
                 _result = PowerBIConfig.CharacterSetsResponse;
+                return;
+            }
+
+            if (normalizedQuery.Replace("\n", "").Equals(PgConfig.VersionQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PgConfig.VersionResponse;
+                return;
+            }
+
+            if (normalizedQuery.Equals(NpgsqlConfig.Npgsql5TypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PgConfig.Npgsql5TypesResponse;
+                return;
+            }
+
+            if (normalizedQuery.Equals(NpgsqlConfig.Npgsql5CompositeTypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PgConfig.Npgsql5CompositeTypesResponse;
+                return;
+            }
+
+            if (normalizedQuery.Equals(NpgsqlConfig.Npgsql5EnumTypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PgConfig.Npgsql5EnumTypesResponse;
+                return;
+            }
+
+            if (normalizedQuery.Equals(NpgsqlConfig.Npgsql4TypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PgConfig.Npgsql4TypesResponse;
+                return;
+            }
+
+            if (normalizedQuery.Equals(NpgsqlConfig.Npgsql4_1_2TypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PgConfig.Npgsql4_1_2TypesResponse;
+                return;
+            }
+
+            if (normalizedQuery.Equals(NpgsqlConfig.Npgsql4_0_0TypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PgConfig.Npgsql4_0_0TypesResponse;
+                return;
+            }
+
+            if (normalizedQuery.Equals(NpgsqlConfig.Npgsql4_0_0CompositeTypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PgConfig.Npgsql4_0_0CompositeTypesResponse;
+                return;
+            }
+
+            if (normalizedQuery.Equals(NpgsqlConfig.Npgsql3TypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PgConfig.Npgsql3TypesResponse;
                 return;
             }
         }

@@ -39,7 +39,7 @@ namespace PgRvn.Server
                         for (var index = 0; index < fields.Length; index++)
                         {
                             var field = fields[index];
-                            
+
                             var obj = field switch
                             {
                                 "NULL" => null,
@@ -48,7 +48,10 @@ namespace PgRvn.Server
                                 _ => table.Columns[index].PgType.FromString(field)
                             };
 
-                            row[index] = table.Columns[index].PgType.ToBytes(obj, table.Columns[index].FormatCode);
+                            if (obj == null)
+                                row[index] = null;
+                            else
+                                row[index] = table.Columns[index].PgType.ToBytes(obj, table.Columns[index].FormatCode);
                         }
 
                         // TODO: Create a constructor for PgDataRow
@@ -63,7 +66,7 @@ namespace PgRvn.Server
             return table;
         }
 
-        private static void HandleColumns(string[] fields, Dictionary<string, PgColumn> columns, ref PgTable pgTable)
+        private static void HandleColumns(string[] fields, IReadOnlyDictionary<string, PgColumn> columns, ref PgTable pgTable)
         {
             foreach (var columnName in fields)
             {
