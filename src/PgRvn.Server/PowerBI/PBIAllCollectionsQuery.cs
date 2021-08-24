@@ -45,7 +45,7 @@ namespace PgRvn.Server.PowerBI
 
         public override async Task Execute(MessageBuilder builder, PipeWriter writer, CancellationToken token)
         {
-            var collectionStats = _documentStore.Maintenance.Send(new GetCollectionStatisticsOperation());
+            var collectionStats = DocumentStore.Maintenance.Send(new GetCollectionStatisticsOperation());
 
             foreach (var collection in collectionStats.Collections.Keys)
             {

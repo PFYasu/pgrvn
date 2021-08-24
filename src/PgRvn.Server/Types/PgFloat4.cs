@@ -14,7 +14,7 @@ namespace PgRvn.Server.Types
         public override short Size => sizeof(float);
         public override int TypeModifier => -1;
 
-        public override byte[] ToBytes(object value, PgFormat formatCode)
+        public override ReadOnlyMemory<byte> ToBytes(object value, PgFormat formatCode)
         {
             if (formatCode == PgFormat.Text)
             {

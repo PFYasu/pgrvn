@@ -20,17 +20,16 @@ namespace PgRvn.Server
 {
     public class RqlQuery : PgQuery
     {
-        protected readonly IDocumentStore _documentStore;
+        protected readonly IDocumentStore DocumentStore;
         private readonly IAsyncDocumentSession _session;
         private QueryResult _result;
         private bool _hasId;
-        private bool _hasIncludes;
-        private int? _limit;
+        private readonly int? _limit;
         private Operation _operation;
 
         public RqlQuery(string queryString, int[] parametersDataTypes, IDocumentStore documentStore, int? limit = null) : base(queryString, parametersDataTypes)
         {
-            _documentStore = documentStore;
+            DocumentStore = documentStore;
             _session = documentStore.OpenAsyncSession();
             _limit = limit;
         }
@@ -75,7 +74,7 @@ namespace PgRvn.Server
             }
             catch (Raven.Client.Exceptions.RavenException)
             {
-                _operation = _documentStore.Operations.Send(new PatchByQueryOperation(new IndexQuery
+                _operation = await DocumentStore.Operations.SendAsync(new PatchByQueryOperation(new IndexQuery
                 {
                     Query = QueryString,
                     QueryParameters = patchParams
@@ -96,8 +95,7 @@ namespace PgRvn.Server
             var resultsFormat = GetDefaultResultsFormat();
             var sample = (BlittableJsonReaderObject)_result.Results[0];
 
-            if (sample.TryGet("@metadata", out BlittableJsonReaderObject metadata) && metadata.TryGet("@id", out string _) ||
-                _result.Includes.Count > 0)
+            if (sample.TryGet("@metadata", out BlittableJsonReaderObject metadata) && metadata.TryGet("@id", out string _))
             {
                 _hasId = true;
                 Columns["id()"] = new PgColumn("id()", (short)Columns.Count, PgText.Default, resultsFormat);
@@ -148,7 +146,7 @@ namespace PgRvn.Server
                     };
                 }
 
-                Columns.TryAdd(prop.Name, new PgColumn(prop.Name, (short)Columns.Count, pgType, resultsFormat, -1));
+                Columns.TryAdd(prop.Name, new PgColumn(prop.Name, (short)Columns.Count, pgType, resultsFormat));
             }
 
             if (Columns.TryGetValue("json()", out var jsonColumn))
@@ -158,20 +156,6 @@ namespace PgRvn.Server
             else
             {
                 Columns["json()"] = new PgColumn("json()", (short)Columns.Count, PgJson.Default, resultsFormat);
-            }
-
-            if (_result.Includes.Count != 0)
-            {
-                _hasIncludes = true;
-
-                if (Columns.TryGetValue("is_include()", out var includesColumn))
-                {
-                    includesColumn.PgType = PgBool.Default;
-                }
-                else
-                {
-                    Columns["is_include()"] = new PgColumn("is_include()", (short)Columns.Count, PgBool.Default, resultsFormat);
-                }
             }
 
             return Columns.Values;
@@ -248,12 +232,6 @@ namespace PgRvn.Server
                 var idIndex = Columns["id()"].ColumnIndex;
                 var jsonIndex = Columns["json()"].ColumnIndex;
 
-                var includesIndex = -1;
-                if (Columns.TryGetValue("is_include()", out var includesColumn))
-                {
-                    includesIndex = includesColumn.ColumnIndex;
-                }
-
                 foreach (BlittableJsonReaderObject result in _result.Results)
                 {
                     Array.Clear(row, 0, row.Length);
@@ -276,7 +254,7 @@ namespace PgRvn.Server
                             continue;
                         result.GetPropertyByIndex(index, ref prop);
 
-                        byte[] value = null;
+                        ReadOnlyMemory<byte>? value = null;
                         switch (prop.Token & BlittableJsonReaderBase.TypesMask, pgColumn.PgType.Oid)
                         {
                             case (BlittableJsonToken.Boolean, PgTypeOIDs.Bool):
@@ -360,22 +338,6 @@ namespace PgRvn.Server
                         row[jsonIndex] = Encoding.UTF8.GetBytes(modified.ToString());
                     }
 
-                    if (_hasIncludes)
-                    {
-                        row[includesIndex] = PgBool.FalseBuffer;
-                    }
-                    await writer.WriteAsync(builder.DataRow(row[..Columns.Count]), token);
-                }
-
-                for (int i = 0; i < _result.Includes.Count; i++)
-                {
-                    Array.Clear(row, 0, row.Length);
-
-                    _result.Includes.GetPropertyByIndex(i, ref prop);
-
-                    row[idIndex] = Encoding.UTF8.GetBytes(prop.Name);
-                    row[jsonIndex] = Encoding.UTF8.GetBytes(prop.Value.ToString());
-                    row[includesIndex] = PgBool.TrueBuffer;
                     await writer.WriteAsync(builder.DataRow(row[..Columns.Count]), token);
                 }
             }
@@ -384,7 +346,7 @@ namespace PgRvn.Server
                 ArrayPool<ReadOnlyMemory<byte>?>.Shared.Return(row);
             }
 
-            await writer.WriteAsync(builder.CommandComplete($"SELECT {_result.Results.Length + _result.Includes.Count}"), token);
+            await writer.WriteAsync(builder.CommandComplete($"SELECT {_result.Results.Length}"), token);
         }
 
         public override void Dispose()

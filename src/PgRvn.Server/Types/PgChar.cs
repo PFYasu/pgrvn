@@ -14,7 +14,7 @@ namespace PgRvn.Server.Types
         public override short Size => sizeof(byte);
         public override int TypeModifier => -1;
 
-        public override byte[] ToBytes(object value, PgFormat formatCode)
+        public override ReadOnlyMemory<byte> ToBytes(object value, PgFormat formatCode)
         {
             return Utf8GetBytes(value); // TODO: Verify this works
         }

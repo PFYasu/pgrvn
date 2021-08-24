@@ -17,7 +17,7 @@ namespace PgRvn.Server.Types
         
         public static byte[] TrueBuffer = { 1 }, FalseBuffer = { 0 };
 
-        public override byte[] ToBytes(object value, PgFormat formatCode)
+        public override ReadOnlyMemory<byte> ToBytes(object value, PgFormat formatCode)
         {
             if (formatCode == PgFormat.Text)
             {

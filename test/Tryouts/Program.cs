@@ -147,9 +147,9 @@ namespace Tryouts
             }
 
 
-            InitODBC();
+            //InitODBC();
 
-            //Console.ReadLine();
+            Console.ReadLine();
 
             //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
             //var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading

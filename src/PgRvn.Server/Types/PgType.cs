@@ -14,7 +14,7 @@ namespace PgRvn.Server.Types
         public abstract short Size { get; }
         public abstract int TypeModifier { get; }
 
-        public abstract byte[] ToBytes(object value, PgFormat formatCode);
+        public abstract ReadOnlyMemory<byte> ToBytes(object value, PgFormat formatCode);
         public abstract object FromBytes(byte[] buffer, PgFormat formatCode);
 
         public static PgType Parse(int dataType) // todo: int typeModifier
