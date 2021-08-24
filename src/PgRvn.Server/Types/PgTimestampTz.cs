@@ -29,21 +29,20 @@ namespace PgRvn.Server.Types
         {
             if (formatCode == PgFormat.Text)
             {
-                return GetDateTimeOffset(Utf8GetString(buffer)); // TODO: Verify it works
+                return FromString(Utf8GetString(buffer)); // TODO: Verify it works
             }
 
             return GetDateTime(IPAddress.NetworkToHostOrder(BitConverter.ToInt64(buffer)));
         }
 
+        public override object FromString(string value)
+        {
+            return DateTimeOffset.Parse(value).ToOffset(TimeSpan.Zero);
+        }
+
         private static DateTime GetDateTime(long timestamp)
         {
             return new DateTime(timestamp * PgTimestamp.TicksMultiplier + PgTimestamp.OffsetTicks, DateTimeKind.Utc);
-        }
-
-        private static DateTimeOffset GetDateTimeOffset(string datetimeStr)
-        {
-            var dt = DateTimeOffset.Parse(datetimeStr).ToOffset(TimeSpan.Zero);
-            return dt;
         }
 
         // TODO: Try using PgTimestamp's function instead, but make sure that the conversions don't break anything

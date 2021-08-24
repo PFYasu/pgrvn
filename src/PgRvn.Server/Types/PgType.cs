@@ -16,6 +16,7 @@ namespace PgRvn.Server.Types
 
         public abstract ReadOnlyMemory<byte> ToBytes(object value, PgFormat formatCode);
         public abstract object FromBytes(byte[] buffer, PgFormat formatCode);
+        public abstract object FromString(string value);
 
         public static PgType Parse(int dataType) // todo: int typeModifier
         {

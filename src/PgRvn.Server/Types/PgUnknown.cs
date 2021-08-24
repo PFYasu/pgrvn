@@ -23,5 +23,10 @@ namespace PgRvn.Server.Types
         {
             return buffer;
         }
+
+        public override object FromString(string value)
+        {
+            return value;
+        }
     }
 }

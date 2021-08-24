@@ -29,10 +29,15 @@ namespace PgRvn.Server.Types
         {
             if (formatCode == PgFormat.Text)
             {
-                return int.Parse(Utf8GetString(buffer));
+                return FromString(Utf8GetString(buffer));
             }
 
             return IPAddress.NetworkToHostOrder(BitConverter.ToInt32(buffer));
+        }
+
+        public override object FromString(string value)
+        {
+            return int.Parse(value);
         }
     }
 }

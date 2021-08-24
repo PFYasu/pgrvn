@@ -28,10 +28,15 @@ namespace PgRvn.Server.Types
         {
             if (formatCode == PgFormat.Text)
             {
-                return float.Parse(Utf8GetString(buffer));
+                return FromString(Utf8GetString(buffer));
             }
 
             return BitConverter.ToSingle(buffer.Reverse().ToArray());
+        }
+
+        public override object FromString(string value)
+        {
+            return float.Parse(value);
         }
     }
 }

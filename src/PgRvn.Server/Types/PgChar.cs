@@ -23,5 +23,10 @@ namespace PgRvn.Server.Types
         {
             return Utf8GetString(buffer); // TODO: Verify this works
         }
+
+        public override object FromString(string value)
+        {
+            return value;
+        }
     }
 }
