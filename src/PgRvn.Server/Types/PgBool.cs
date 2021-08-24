@@ -31,10 +31,15 @@ namespace PgRvn.Server.Types
         {
             if (formatCode == PgFormat.Text)
             {
-                return Utf8GetString(buffer).Equals("t");
+                return FromString(Utf8GetString(buffer));
             }
 
             return buffer.Equals(TrueBuffer);
+        }
+
+        public override object FromString(string value)
+        {
+            return value.Equals("t");
         }
     }
 }

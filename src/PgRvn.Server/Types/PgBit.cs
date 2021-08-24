@@ -35,10 +35,15 @@ namespace PgRvn.Server.Types
         {
             if (formatCode == PgFormat.Text)
             {
-                return Utf8GetString(buffer).Equals("1");
+                return FromString(Utf8GetString(buffer));
             }
 
             return buffer.Equals(PgBool.TrueBuffer);
+        }
+
+        public override object FromString(string value)
+        {
+            return value.Equals("1");
         }
     }
 }

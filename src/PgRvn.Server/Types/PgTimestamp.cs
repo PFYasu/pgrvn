@@ -34,20 +34,20 @@ namespace PgRvn.Server.Types
         {
             if (formatCode == PgFormat.Text)
             {
-                return GetDateTime(Utf8GetString(buffer)); // TODO: Verify it works
+                return FromString(Utf8GetString(buffer)); // TODO: Verify it works
             }
 
             return GetDateTime(IPAddress.NetworkToHostOrder(BitConverter.ToInt64(buffer)));
         }
 
+        public override object FromString(string value)
+        {
+            return DateTime.Parse(value);
+        }
+
         private static DateTime GetDateTime(long timestamp)
         {
             return new DateTime(timestamp * PgTimestamp.TicksMultiplier + PgTimestamp.OffsetTicks);
-        }
-
-        private static DateTime GetDateTime(string datetimeStr)
-        {
-            return DateTime.Parse(datetimeStr);
         }
 
         private static long GetTimestamp(DateTime timestamp)

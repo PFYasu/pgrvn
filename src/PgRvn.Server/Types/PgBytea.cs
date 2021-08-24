@@ -23,5 +23,10 @@ namespace PgRvn.Server.Types
         {
             return buffer; // TODO: Verify this works
         }
+
+        public override object FromString(string value)
+        {
+            throw new NotSupportedException("Converting string to bytea is not supported. Tried converting: " + value);
+        }
     }
 }

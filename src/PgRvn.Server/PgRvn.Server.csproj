@@ -23,4 +23,13 @@
     <PackageReference Include="TSQL.Parser" Version="1.5.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="types_query.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="version_query.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

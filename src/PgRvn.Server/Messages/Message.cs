@@ -100,6 +100,12 @@ namespace PgRvn.Server.Messages
     {
         public List<PgColumn> Columns;
         public List<PgDataRow> Data;
+
+        public PgTable()
+        {
+            Columns = new List<PgColumn>();
+            Data = new List<PgDataRow>();
+        }
     }
 
     public class PgDataRow

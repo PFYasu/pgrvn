@@ -30,13 +30,18 @@ namespace PgRvn.Server.Types
         public override object FromBytes(byte[] buffer, PgFormat formatCode)
         {
             var str = Utf8GetString(buffer);
-            if (TypeModifier != -1 && str.Length > TypeModifier)
+            return FromString(str);
+        }
+
+        public override object FromString(string value)
+        {
+            if (TypeModifier != -1 && value.Length > TypeModifier)
             {
-                throw new PgErrorException(PgErrorCodes.StringDataRightTruncation, 
-                    $"Converted value too long ({str.Length}) for type character varying({TypeModifier})");
+                throw new PgErrorException(PgErrorCodes.StringDataRightTruncation,
+                    $"Converted value too long ({value.Length}) for type character varying({TypeModifier})");
             }
 
-            return str;
+            return value;
         }
     }
 }

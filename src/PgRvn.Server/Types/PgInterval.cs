@@ -41,10 +41,15 @@ namespace PgRvn.Server.Types
         {
             if (formatCode == PgFormat.Text)
             {
-                return TimeSpan.Parse(Utf8GetString(buffer)); // TODO: Verify this works
+                return FromString(Utf8GetString(buffer)); // TODO: Verify this works
             }
 
             return GetTimeSpan(buffer);
+        }
+
+        public override object FromString(string value)
+        {
+            return TimeSpan.Parse(value);
         }
 
         private static object GetTimeSpan(byte[] buffer)
