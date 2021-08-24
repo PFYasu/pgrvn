@@ -7,22 +7,24 @@ using System.Threading.Tasks;
 
 namespace PgRvn.Server
 {
-    public static class RegexExtensions
+    public static class StringExtensions
     {
         public static string Replace(this string input, Regex regex, string groupName, string replacement)
         {
-            return regex.Replace(input, m =>
-            {
-                return ReplaceNamedGroup(input, groupName, replacement, m);
-            });
+            return regex.Replace(input, m => ReplaceNamedGroup(input, groupName, replacement, m));
         }
 
         private static string ReplaceNamedGroup(string input, string groupName, string replacement, Match m)
         {
-            string capture = m.Value;
+            var capture = m.Value;
             capture = capture.Remove(m.Groups[groupName].Index - m.Index, m.Groups[groupName].Length);
             capture = capture.Insert(m.Groups[groupName].Index - m.Index, replacement);
             return capture;
+        }
+
+        public static string NormalizeLineEndings(this string input)
+        {
+            return input.Replace("\r\n", "\n").Replace("\r", "\n");
         }
     }
 }

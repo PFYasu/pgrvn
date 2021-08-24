@@ -361,10 +361,11 @@ namespace PgRvn.Server.Messages
         {
             if (pos + addedSize > Buffer.Length)
             {
-                var oldOwner = _bufferOwner;
-                _bufferOwner = MemoryPool<byte>.Shared.Rent(oldOwner.Memory.Length * 2);
-                oldOwner.Memory.CopyTo(_bufferOwner.Memory);
-                oldOwner.Dispose();
+                using (var oldOwner = _bufferOwner)
+                {
+                    _bufferOwner = MemoryPool<byte>.Shared.Rent(oldOwner.Memory.Length * 2);
+                    oldOwner.Memory.CopyTo(_bufferOwner.Memory);
+                }
             }
         }
 

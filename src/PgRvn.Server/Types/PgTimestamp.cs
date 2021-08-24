@@ -19,7 +19,7 @@ namespace PgRvn.Server.Types
         public const long OffsetTicks = 630822816000000000L;
         public const int TicksMultiplier = 10;
 
-        public override byte[] ToBytes(object value, PgFormat formatCode)
+        public override ReadOnlyMemory<byte> ToBytes(object value, PgFormat formatCode)
         {
             if (formatCode == PgFormat.Text)
             {

@@ -27,84 +27,58 @@ namespace PgRvn.Server
                 throw new InvalidOperationException("Didn't expect more than one SQL statement in queryString, got: " + sqlStatements.Count);
             }
 
-            foreach (var stmt in sqlStatements)
+            // TODO: Treat the results like any other data source and acknowledge the results format
+            var resultsFormat = GetDefaultResultsFormat();
+
+            // TODO: Find a way to support multiple statements - TSQL doesn't seem to provide each statement's string
+
+            var normalizedQuery = QueryString.NormalizeLineEndings();
+            if (normalizedQuery.Equals(PowerBIConfig.TypesQuery, StringComparison.OrdinalIgnoreCase))
             {
-                var powerBiMatch = PowerBIConfig.TypesQuery;
-                if (QueryString.Equals(powerBiMatch))
-                {
-                    _result = PowerBIConfig.TypesResponse;
-                    return;
-                }
+                _result = PowerBIConfig.TypesResponse;
+                return;
+            }
 
-                powerBiMatch = PowerBIConfig.CompositeTypesQuery;
-                if (QueryString.StartsWith(powerBiMatch))
-                {
-                    _result = PowerBIConfig.CompositeTypesResponse;
-                    return;
-                }
+            if (normalizedQuery.StartsWith(PowerBIConfig.CompositeTypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PowerBIConfig.CompositeTypesResponse;
+                return;
+            }
 
-                powerBiMatch = PowerBIConfig.EnumTypesQuery;
+            if (normalizedQuery.Equals(PowerBIConfig.EnumTypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PowerBIConfig.EnumTypesResponse;
+                return;
+            }
 
-                if (QueryString.Equals(powerBiMatch))
-                {
-                    _result = PowerBIConfig.EnumTypesResponse;
-                    return;
-                }
+            if (normalizedQuery.StartsWith(PowerBIConfig.TableSchemaQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PowerBIConfig.TableSchemaResponse;
+                return;
+            }
 
-                powerBiMatch = PowerBIConfig.TableSchemaQuery;
-                if (QueryString.StartsWith(powerBiMatch))
-                {
-                    _result = PowerBIConfig.TableSchemaResponse;
-                    return;
-                }
+            if (normalizedQuery.StartsWith(PowerBIConfig.TableSchemaSecondaryQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PowerBIConfig.TableSchemaSecondaryResponse;
+                return;
+            }
 
-                powerBiMatch = PowerBIConfig.TableSchemaSecondaryQuery;
-                if (QueryString.StartsWith(powerBiMatch))
-                {
-                    _result = PowerBIConfig.TableSchemaSecondaryResponse;
-                    return;
-                }
+            if (normalizedQuery.StartsWith(PowerBIConfig.ConstraintsQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PowerBIConfig.ConstraintsResponse;
+                return;
+            }
 
-                powerBiMatch = PowerBIConfig.ConstraintsQuery;
-                if (QueryString.StartsWith(powerBiMatch))
-                {
-                    _result = PowerBIConfig.ConstraintsResponse;
-                    return;
-                }
+            if (normalizedQuery.Equals(PowerBIConfig.VersionQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PowerBIConfig.VersionResponse;
+                return;
+            }
 
-                powerBiMatch = PowerBIConfig.VersionQuery;
-                if (QueryString.Replace("\n", "").Replace("\r", "").Equals(powerBiMatch, StringComparison.OrdinalIgnoreCase))
-                {
-                    _result = PowerBIConfig.VersionResponse;
-                    return;
-                }
-
-                // TODO: Treat the results like any other data source and acknowledge the results format
-                var resultsFormat = GetDefaultResultsFormat();
-
-                powerBiMatch = "select character_set_name from INFORMATION_SCHEMA.character_sets";
-                if (QueryString.Equals(powerBiMatch))
-                {
-                    _result = new PgTable
-                    {
-                        Columns = new List<PgColumn>
-                        {
-                            new PgColumn("character_set_name", 0, PgName.Default, resultsFormat),
-                        },
-                        Data = new List<PgDataRow>
-                        {
-                            new()
-                            {
-                                ColumnData = new ReadOnlyMemory<byte>?[]
-                                {
-                                    Encoding.UTF8.GetBytes("UTF8"),
-                                }
-                            },
-                        }
-                    };
-
-                    return;
-                }
+            if (normalizedQuery.Equals(PowerBIConfig.CharacterSetsQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = PowerBIConfig.CharacterSetsResponse;
+                return;
             }
         }
 
