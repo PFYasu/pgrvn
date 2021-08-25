@@ -34,29 +34,8 @@ namespace PgRvn.Server
             // TODO: Find a way to support multiple statements - TSQL doesn't seem to provide each statement's string
 
             var normalizedQuery = QueryString.NormalizeLineEndings();
-            if (normalizedQuery.Equals(PowerBIConfig.TypesQuery, StringComparison.OrdinalIgnoreCase))
-            {
-                _result = PowerBIConfig.TypesResponse;
-                return;
-            }
 
-            // Npgsql & PowerBI send this
-            // TODO: Figure out which versions of npgsql send this
-            // 4.1.1
-            if (normalizedQuery.StartsWith(NpgsqlConfig.CompositeTypesQuery, StringComparison.OrdinalIgnoreCase))
-            {
-                _result = PowerBIConfig.CompositeTypesResponse;
-                return;
-            }
-
-            // Npgsql & PowerBI send this
-            // 4.1.1, 4.0.0
-            if (normalizedQuery.Equals(NpgsqlConfig.EnumTypesQuery, StringComparison.OrdinalIgnoreCase))
-            {
-                _result = PowerBIConfig.EnumTypesResponse;
-                return;
-            }
-
+            // PowerBI
             if (normalizedQuery.StartsWith(PowerBIConfig.TableSchemaQuery, StringComparison.OrdinalIgnoreCase))
             {
                 _result = PowerBIConfig.TableSchemaResponse;
@@ -81,57 +60,82 @@ namespace PgRvn.Server
                 return;
             }
 
-            if (normalizedQuery.Replace("\n", "").Equals(PgConfig.VersionQuery, StringComparison.OrdinalIgnoreCase))
+            // Npgsql
+            if (normalizedQuery.Equals(NpgsqlConfig.TypesQuery, StringComparison.OrdinalIgnoreCase))
             {
-                _result = PgConfig.VersionResponse;
+                _result = NpgsqlConfig.TypesResponse;
+                return;
+            }
+
+            if (normalizedQuery.StartsWith(NpgsqlConfig.CompositeTypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = NpgsqlConfig.CompositeTypesResponse;
+                return;
+            }
+
+            if (normalizedQuery.Equals(NpgsqlConfig.EnumTypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = NpgsqlConfig.EnumTypesResponse;
+                return;
+            }
+
+            if (normalizedQuery.Replace("\n", "").Equals(NpgsqlConfig.VersionQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = NpgsqlConfig.VersionResponse;
                 return;
             }
 
             if (normalizedQuery.Equals(NpgsqlConfig.Npgsql5TypesQuery, StringComparison.OrdinalIgnoreCase))
             {
-                _result = PgConfig.Npgsql5TypesResponse;
+                _result = NpgsqlConfig.Npgsql5TypesResponse;
                 return;
             }
 
             if (normalizedQuery.Equals(NpgsqlConfig.Npgsql5CompositeTypesQuery, StringComparison.OrdinalIgnoreCase))
             {
-                _result = PgConfig.Npgsql5CompositeTypesResponse;
+                _result = NpgsqlConfig.Npgsql5CompositeTypesResponse;
                 return;
             }
 
             if (normalizedQuery.Equals(NpgsqlConfig.Npgsql5EnumTypesQuery, StringComparison.OrdinalIgnoreCase))
             {
-                _result = PgConfig.Npgsql5EnumTypesResponse;
+                _result = NpgsqlConfig.Npgsql5EnumTypesResponse;
                 return;
             }
 
             if (normalizedQuery.Equals(NpgsqlConfig.Npgsql4TypesQuery, StringComparison.OrdinalIgnoreCase))
             {
-                _result = PgConfig.Npgsql4TypesResponse;
+                _result = NpgsqlConfig.Npgsql4TypesResponse;
                 return;
             }
 
             if (normalizedQuery.Equals(NpgsqlConfig.Npgsql4_1_2TypesQuery, StringComparison.OrdinalIgnoreCase))
             {
-                _result = PgConfig.Npgsql4_1_2TypesResponse;
+                _result = NpgsqlConfig.Npgsql4_1_2TypesResponse;
+                return;
+            }
+
+            if (normalizedQuery.Equals(NpgsqlConfig.Npgsql4_0_3TypesQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                _result = NpgsqlConfig.Npgsql4_0_3TypesResponse;
                 return;
             }
 
             if (normalizedQuery.Equals(NpgsqlConfig.Npgsql4_0_0TypesQuery, StringComparison.OrdinalIgnoreCase))
             {
-                _result = PgConfig.Npgsql4_0_0TypesResponse;
+                _result = NpgsqlConfig.Npgsql4_0_0TypesResponse;
                 return;
             }
 
             if (normalizedQuery.Equals(NpgsqlConfig.Npgsql4_0_0CompositeTypesQuery, StringComparison.OrdinalIgnoreCase))
             {
-                _result = PgConfig.Npgsql4_0_0CompositeTypesResponse;
+                _result = NpgsqlConfig.Npgsql4_0_0CompositeTypesResponse;
                 return;
             }
 
             if (normalizedQuery.Equals(NpgsqlConfig.Npgsql3TypesQuery, StringComparison.OrdinalIgnoreCase))
             {
-                _result = PgConfig.Npgsql3TypesResponse;
+                _result = NpgsqlConfig.Npgsql3TypesResponse;
                 return;
             }
         }

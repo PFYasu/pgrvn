@@ -24,13 +24,5 @@ namespace PgRvn.Server
             ["standard_conforming_strings"] = "on",
             ["TimeZone"] = "UTC",
         };
-
-        public static readonly string VersionQuery = "select version()";
-        public static readonly PgTable VersionResponse = CsvToPg.Convert(
-            @"version_query.csv",
-            new Dictionary<string, PgColumn>
-            {
-                {"version", new PgColumn("version", 0, PgText.Default, PgFormat.Text)}
-            });
     }
 }
