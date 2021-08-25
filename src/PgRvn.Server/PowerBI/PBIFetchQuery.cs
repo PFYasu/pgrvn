@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using PgRvn.Server.Exceptions;
 
@@ -271,9 +272,9 @@ namespace PgRvn.Server.PowerBI
             return val;
         }
 
-        private static string GenerateProjectedRql(Match rqlMatch, List<KeyValuePair<string, string>> projectionFields, ICollection<Match> matches)
+        private static string GenerateProjectedRql(Match rqlMatch, List<KeyValuePair<string, string>> projectionFields, ICollection<Match> sqlMatches)
         {
-            var rql = rqlMatch.Value;
+            var rql = new StringBuilder(rqlMatch.Value);
 
             var collection = rqlMatch.Groups["collection"];
             var alias = rqlMatch.Groups["alias"];
@@ -292,7 +293,7 @@ namespace PgRvn.Server.PowerBI
             if (alias.Success == false)
             {
                 const string newAliasClause = " as x";
-                rql = rql.Insert(collection.Index + collection.Length, newAliasClause);
+                rql.Insert(collection.Index + collection.Length, newAliasClause);
 
                 aliasLength = newAliasClause.Length;
                 whereIndex += newAliasClause.Length;
@@ -300,23 +301,10 @@ namespace PgRvn.Server.PowerBI
             }
 
             // Insert new where clause
-            // Note: Filtering of projected columns is not supported
-            var fullNewWhere = "";
-            foreach (var match in matches)
-            {
-                var sqlWhere = match.Groups["where"];
-                if (!sqlWhere.Success) 
-                    continue;
-
-                if (fullNewWhere.Length != 0)
-                    fullNewWhere += "\nand\n\t";
-
-                fullNewWhere += $"(\n\t{sqlWhere.Value}\n)";
-            }
-
+            var fullNewWhere = CombineSqlMatchesWhereClause(sqlMatches);
             if (fullNewWhere.Length != 0)
             {
-                fullNewWhere = WhereColumnRegex.Replace(fullNewWhere, "${column}");
+                fullNewWhere = WhereColumnRegex.Replace(fullNewWhere.ToString(), "${column}");
                 fullNewWhere = WhereOperatorRegex.Replace(fullNewWhere, (m) =>
                 {
                     if (OperatorMap.TryGetValue(m.Value, out var val))
@@ -330,7 +318,7 @@ namespace PgRvn.Server.PowerBI
                 else
                     fullNewWhere = $" where\n{fullNewWhere}\n";
 
-                rql = rql.Insert(whereIndex + whereLength, fullNewWhere);
+                rql.Insert(whereIndex + whereLength, fullNewWhere);
 
                 whereLength += fullNewWhere.Length;
                 selectIndex += fullNewWhere.Length;
@@ -339,30 +327,48 @@ namespace PgRvn.Server.PowerBI
             // Remove existing select clause
             if (select.Success)
             {
-                rql = rql.Remove(selectIndex, select.Length);
+                rql.Remove(selectIndex, select.Length);
             }
 
             // Insert new select clause
             if (projectionFields.Count != 0)
             {
                 var projection = GenerateProjectionString(projectionFields);
-                rql = rql.Insert(selectIndex, projection);
+                rql.Insert(selectIndex, projection);
             }
 
-            return rql;
+            return rql.ToString();
         }
 
-        private static string GenerateProjectionString(IEnumerable<KeyValuePair<string, string>> projectionFields)
+        private static string CombineSqlMatchesWhereClause(IEnumerable<Match> sqlMatches)
         {
-            var projection = " select\n{\n";
+            // Note: Filtering of projected columns is not supported
+            var fullNewWhere = new StringBuilder();
+            foreach (var match in sqlMatches)
+            {
+                var sqlWhere = match.Groups["where"];
+                if (!sqlWhere.Success)
+                    continue;
+
+                if (fullNewWhere.Length != 0)
+                    fullNewWhere.Append("\nand\n\t");
+
+                fullNewWhere.Append($"(\n\t{sqlWhere.Value}\n)");
+            }
+
+            return fullNewWhere.ToString();
+        }
+        private static StringBuilder GenerateProjectionString(IEnumerable<KeyValuePair<string, string>> projectionFields)
+        {
+            var projection = new StringBuilder(" select\n{\n");
 
             foreach (var (fieldName, fieldValue) in projectionFields)
             {
-                projection += $"\t\"{fieldName}\": {fieldValue},\n";
+                projection.Append($"\t\"{fieldName}\": {fieldValue},\n");
             }
 
-            projection = projection[0..^2];
-            projection += "\n}\n";
+            projection.Remove(projection.Length - 2, 2);
+            projection.Append("\n}\n");
 
             return projection;
         }
