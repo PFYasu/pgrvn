@@ -135,27 +135,35 @@ namespace PgRvn.Server.Messages
 
     public abstract class Message
     {
-        public virtual async Task Handle(Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
+        public async Task Init(MessageReader messageReader, PipeReader reader, CancellationToken token)
         {
-            try
+            var msgLen = await messageReader.ReadInt32Async(reader, token) - sizeof(int);
+            var bytesRead = await InitMessage(messageReader, reader, token, msgLen);
+
+            if (msgLen != bytesRead)
             {
-                await HandleMessage(transaction, messageBuilder, writer, token);
-            }
-            catch (PgErrorException e)
-            {
-                await HandleError(e, transaction, messageBuilder, writer, token);
+                throw new PgFatalException(PgErrorCodes.ProtocolViolation,
+                    $"Message is larger than specified in msgLen field, {msgLen} extra bytes in message.");
             }
         }
+
+        public virtual async Task Handle(Transaction transaction, MessageBuilder messageBuilder, MessageReader messageReader, PipeReader reader, PipeWriter writer, CancellationToken token)
+        {
+            await HandleMessage(transaction, messageBuilder, writer, token);
+        }
+
+        public virtual async Task HandleError(PgErrorException e, Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
+        {
+            // Should assume none of the members are properly initialized
+            await writer.WriteAsync(messageBuilder.ErrorResponse(
+                PgSeverity.Error,
+                e.ErrorCode,
+                e.Message,
+                e.ToString()), token);
+        }
+
+        protected abstract Task<int> InitMessage(MessageReader messageReader, PipeReader reader, CancellationToken token, int msgLen);
 
         protected abstract Task HandleMessage(Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token);
-
-        public virtual async Task HandleError(PgErrorException e, Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token) 
-        {
-            await writer.WriteAsync(messageBuilder.ErrorResponse(
-                            PgSeverity.Error,
-                            e.ErrorCode,
-                            e.Message,
-                            e.ToString()), token);
-        }
     }
 }

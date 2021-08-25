@@ -22,16 +22,11 @@ namespace PgRvn.Server
 
         public void Parse(bool allowMultipleStatements)
         {
-            var sqlStatements = TSQLStatementReader.ParseStatements(QueryString);
-            if (allowMultipleStatements == false && sqlStatements.Count != 1)
-            {
-                throw new InvalidOperationException("Didn't expect more than one SQL statement in queryString, got: " + sqlStatements.Count);
-            }
-
+            // TODO: The hardcoded queries in NpgsqlConfig might look a bit different for every user because they are generated using
+            // a function. Add support to more than just the current queries by not matching the entire string but ignoring parts of it.
+            // TODO: Find a way to support multiple statements - TSQL doesn't seem to provide each statement's string
             // TODO: Treat the results like any other data source and acknowledge the results format
             var resultsFormat = GetDefaultResultsFormat();
-
-            // TODO: Find a way to support multiple statements - TSQL doesn't seem to provide each statement's string
 
             var normalizedQuery = QueryString.NormalizeLineEndings();
 
@@ -67,7 +62,7 @@ namespace PgRvn.Server
                 return;
             }
 
-            if (normalizedQuery.StartsWith(NpgsqlConfig.CompositeTypesQuery, StringComparison.OrdinalIgnoreCase))
+            if (normalizedQuery.Equals(NpgsqlConfig.CompositeTypesQuery, StringComparison.OrdinalIgnoreCase))
             {
                 _result = NpgsqlConfig.CompositeTypesResponse;
                 return;

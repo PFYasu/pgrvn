@@ -17,6 +17,67 @@ namespace PgRvn.Server.Messages
         public List<byte[]> Parameters;
         public short[] ResultColumnFormatCodes;
 
+        protected override async Task<int> InitMessage(MessageReader messageReader, PipeReader reader, CancellationToken token, int msgLen)
+        {
+            var len = 0;
+
+            var (destPortalName, destPortalLength) = await messageReader.ReadNullTerminatedString(reader, token);
+            len += destPortalLength;
+
+            var (preparedStatementName, preparedStatementLength) = await messageReader.ReadNullTerminatedString(reader, token);
+            len += preparedStatementLength;
+
+            var parameterFormatCodeCount = await messageReader.ReadInt16Async(reader, token);
+            len += sizeof(short);
+
+            var parameterCodes = new short[parameterFormatCodeCount];
+            for (var i = 0; i < parameterFormatCodeCount; i++)
+            {
+                parameterCodes[i] = await messageReader.ReadInt16Async(reader, token);
+                len += sizeof(short);
+            }
+
+            var parametersCount = await messageReader.ReadInt16Async(reader, token);
+            len += sizeof(short);
+
+            var parameters = new List<byte[]>(parametersCount);
+            for (var i = 0; i < parametersCount; i++)
+            {
+                var parameterLength = await messageReader.ReadInt32Async(reader, token);
+                len += sizeof(int);
+
+                // Limit parameter size to 1MB
+                if (parameterLength > 1 * 1024 * 1024)
+                {
+                    // Skip to end of message to stay in sync
+                    await messageReader.SkipBytesAsync(reader, token, msgLen - len);
+                    throw new PgErrorException(PgErrorCodes.InvalidParameterValue,
+                        $"Parameter too big, expected 1MB or less but got size of '{parameterLength}'");
+                }
+
+                parameters.Add(await messageReader.ReadBytesAsync(reader, parameterLength, token));
+                len += parameterLength;
+            }
+
+            var resultColumnFormatCodesCount = await messageReader.ReadInt16Async(reader, token);
+            len += sizeof(short);
+
+            var resultColumnFormatCodes = new short[resultColumnFormatCodesCount];
+            for (var i = 0; i < resultColumnFormatCodesCount; i++)
+            {
+                resultColumnFormatCodes[i] = await messageReader.ReadInt16Async(reader, token);
+                len += sizeof(short);
+            }
+
+            PortalName = destPortalName;
+            StatementName = preparedStatementName;
+            ParameterFormatCodes = parameterCodes;
+            Parameters = parameters;
+            ResultColumnFormatCodes = resultColumnFormatCodes;
+
+            return len;
+        }
+
         protected override async Task HandleMessage(Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
             // TODO: Support named statements/portals

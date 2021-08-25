@@ -136,7 +136,25 @@ namespace Tryouts
             //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
             var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
             using var conn = new NpgsqlConnection(connString); conn.Open();
-            Select(conn, "from Employees");
+
+            //Select(conn, "from Employees");
+            try
+            {
+                Select(conn, "from Orders where OrderedAtUtc = @param1", new Dictionary<string, (NpgsqlDbType, object)>
+                {
+                    ["param1"] = (NpgsqlDbType.Bytea, new byte[1 * 1024 * 1024 + 1000]) // Above 1 MB
+                });
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Ignore");
+                //Console.WriteLine(e);
+            }
+
+            Select(conn, "from Orders where OrderedAtUtc = @param1", new Dictionary<string, (NpgsqlDbType, object)>
+            {
+                ["param1"] = (NpgsqlDbType.Bytea, new byte[1 * 1024 * 1024 - 1000]) // Below 1 MB
+            });
         }
 
         static void Main(string[] args)
@@ -154,16 +172,10 @@ namespace Tryouts
                 return;
             }
 
-            //InitNpgsql();
+            InitNpgsql();
             //InitODBC();
-            Console.ReadLine();
+            Console.ReadKey();
 
-            //var dto = DateTime.Parse("1998-05-05T01:02:03.0405060Z");
-            ////var dto = new TimeSpan(1, 2, 3, 4);
-            //Select(conn, "from Orders where OrderedAtUtc = @param1", new Dictionary<string, (NpgsqlDbType, object)>
-            //{
-            //    ["param1"] = (NpgsqlDbType.TimestampTz, dto)
-            //});
 
             //Select(conn, "SELECT * FROM \"Customers\"");
 

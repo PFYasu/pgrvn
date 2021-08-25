@@ -11,12 +11,12 @@ namespace PgRvn.Server.Messages
 {
     public abstract class ExtendedProtocolMessage : Message
     {
-        public override async Task Handle(Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
+        public override async Task Handle(Transaction transaction, MessageBuilder messageBuilder, MessageReader messageReader, PipeReader reader, PipeWriter writer, CancellationToken token)
         {
             if (transaction.State == TransactionState.Failed && this is not Sync)
                 return;
 
-            await base.Handle(transaction, messageBuilder, writer, token);
+            await base.Handle(transaction, messageBuilder, messageReader, reader, writer, token);
         }
 
         public override async Task HandleError(PgErrorException e, Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)

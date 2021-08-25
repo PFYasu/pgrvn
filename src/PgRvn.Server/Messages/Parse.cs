@@ -25,7 +25,34 @@ namespace PgRvn.Server.Messages
         /// </remarks>
         public int[] ParametersDataTypes;
 
-        private static readonly Regex _paramRegex = new Regex(@"(?<=(?:\$[0-9]))(?:::(?<type>[A-Za-z0-9]+))?", RegexOptions.Compiled);
+        private static readonly Regex ParamRegex = new Regex(@"(?<=(?:\$[0-9]))(?:::(?<type>[A-Za-z0-9]+))?", RegexOptions.Compiled);
+
+        protected override async Task<int> InitMessage(MessageReader messageReader, PipeReader reader, CancellationToken token, int msgLen)
+        {
+            var len = 0;
+
+            var (statementName, statementLength) = await messageReader.ReadNullTerminatedString(reader, token);
+            len += statementLength;
+
+            var (query, queryLength) = await messageReader.ReadNullTerminatedString(reader, token);
+            len += queryLength;
+
+            var parametersCount = await messageReader.ReadInt16Async(reader, token);
+            len += sizeof(short);
+
+            var parameters = new int[parametersCount];
+            for (var i = 0; i < parametersCount; i++)
+            {
+                parameters[i] = await messageReader.ReadInt32Async(reader, token);
+                len += sizeof(int);
+            }
+
+            StatementName = statementName;
+            Query = query;
+            ParametersDataTypes = parameters;
+
+            return len;
+        }
 
         protected override async Task HandleMessage(Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
@@ -36,7 +63,7 @@ namespace PgRvn.Server.Messages
 
             // Extract optional parameter types (e.g. $1::int4)
             var foundParamTypes = new List<string>();
-            var cleanQueryText = _paramRegex.Replace(Query, new MatchEvaluator((Match match) =>
+            var cleanQueryText = ParamRegex.Replace(Query, new MatchEvaluator((Match match) =>
             {
                 foundParamTypes.Add(match.Groups["type"].Value);
                 return "";

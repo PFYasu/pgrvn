@@ -14,6 +14,22 @@ namespace PgRvn.Server.Messages
         public string PortalName;
         public int MaxRows;
 
+        protected override async Task<int> InitMessage(MessageReader messageReader, PipeReader reader, CancellationToken token, int msgLen)
+        {
+            var len = 0;
+
+            var (portalName, portalNameLength) = await messageReader.ReadNullTerminatedString(reader, token);
+            len += portalNameLength;
+
+            var maxRowsToReturn = await messageReader.ReadInt32Async(reader, token);
+            len += sizeof(int);
+
+            PortalName = portalName;
+            MaxRows = maxRowsToReturn;
+
+            return len;
+        }
+
         protected override async Task HandleMessage(Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
             if (transaction.State == TransactionState.Idle)

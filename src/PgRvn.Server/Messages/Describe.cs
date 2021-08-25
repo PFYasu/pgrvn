@@ -15,6 +15,30 @@ namespace PgRvn.Server.Messages
         public PgObjectType PgObjectType;
         public string ObjectName;
 
+        protected override async Task<int> InitMessage(MessageReader messageReader, PipeReader reader, CancellationToken token, int msgLen)
+        {
+            var len = 0;
+
+            var describeObjectType = await messageReader.ReadByteAsync(reader, token);
+            len += sizeof(byte);
+
+            var pgObjectType = describeObjectType switch
+            {
+                (byte)PgObjectType.Portal => PgObjectType.Portal,
+                (byte)PgObjectType.PreparedStatement => PgObjectType.PreparedStatement,
+                _ => throw new PgFatalException(PgErrorCodes.ProtocolViolation,
+                    "Expected valid object type ('S' or 'P'), got: '" + describeObjectType)
+            };
+
+            var (describedName, describedNameLength) = await messageReader.ReadNullTerminatedString(reader, token);
+            len += describedNameLength;
+
+            PgObjectType = pgObjectType;
+            ObjectName = describedName;
+
+            return len;
+        }
+
         protected override async Task HandleMessage(Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
             if (transaction.State == TransactionState.Idle)
