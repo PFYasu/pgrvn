@@ -101,17 +101,18 @@ namespace PgRvn.Server
 
                 while (_token.IsCancellationRequested == false)
                 {
-                    Message message = await messageReader.ReadMessage(reader, _token);
-                    await message.Handle(transaction, messageBuilder, writer, _token);
+                    var message = await messageReader.GetUninitializedMessage(reader, _token);
+
+                    try
+                    {
+                        await message.Init(messageReader, reader, _token);
+                        await message.Handle(transaction, messageBuilder, messageReader, reader, writer, _token);
+                    }
+                    catch (PgErrorException e)
+                    {
+                        await message.HandleError(e, transaction, messageBuilder, writer, _token);
+                    }
                 }
-            }
-            catch (PgErrorException e)
-            {
-                await writer.WriteAsync(messageBuilder.ErrorResponse(
-                    PgSeverity.Error,
-                    e.ErrorCode,
-                    e.Message,
-                    e.ToString()), _token);
             }
             catch (PgFatalException e)
             {
@@ -123,6 +124,7 @@ namespace PgRvn.Server
             }
             catch (PgTerminateReceivedException)
             {
+                // Terminate silently
             }
             catch (Exception e)
             {

@@ -27,7 +27,7 @@ namespace PgRvn.Server
         protected PgQuery(string queryString, int[] parametersDataTypes)
         {
             QueryString = queryString;
-            ParametersDataTypes = parametersDataTypes;
+            ParametersDataTypes = parametersDataTypes ?? Array.Empty<int>();
             IsEmptyQuery = string.IsNullOrWhiteSpace(QueryString);
             Parameters = new Dictionary<string, object>();
             Columns = new Dictionary<string, PgColumn>();

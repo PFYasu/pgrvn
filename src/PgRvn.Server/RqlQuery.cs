@@ -15,6 +15,7 @@ using Raven.Client.Documents.Operations;
 using Raven.Client.Documents.Queries;
 using Raven.Client.Documents.Session;
 using Sparrow.Json;
+using Sparrow.Json.Parsing;
 
 namespace PgRvn.Server
 {
@@ -23,7 +24,6 @@ namespace PgRvn.Server
         protected readonly IDocumentStore DocumentStore;
         private readonly IAsyncDocumentSession _session;
         private QueryResult _result;
-        private bool _hasId;
         private readonly int? _limit;
         private Operation _operation;
 
@@ -31,7 +31,9 @@ namespace PgRvn.Server
         {
             DocumentStore = documentStore;
             _session = documentStore.OpenAsyncSession();
+            _result = null;
             _limit = limit;
+            _operation = null;
         }
 
         public override async Task<ICollection<PgColumn>> Init(bool allowMultipleStatements = false)
@@ -48,11 +50,10 @@ namespace PgRvn.Server
         public async Task RunRqlQuery()
         {
             var query = _session.Advanced.AsyncRawQuery<BlittableJsonReaderObject>(QueryString);
+
+            // If limit is 0, fetch one document for the schema generation
             if (_limit != null)
-            {
-                // If limit is 0, fetch one document for the schema generation
                 query.Take(_limit.Value == 0 ? 1 : _limit.Value);
-            }
 
             // TODO: Support skipping (check how/if powerbi sends it, probably using the incremental refresh feature)
             // query.Skip(..)
@@ -84,20 +85,16 @@ namespace PgRvn.Server
 
         private ICollection<PgColumn> GenerateSchema()
         {
-            if (_result?.Results == null)
+            if (_result?.Results == null || _result?.Results.Length == 0)
             {
-                return Array.Empty<PgColumn>(); // todo: make sure invalid syntax error is sent or smth
-            }
-
-            if (_result.Results.Length == 0)
                 return Array.Empty<PgColumn>();
+            }
 
             var resultsFormat = GetDefaultResultsFormat();
             var sample = (BlittableJsonReaderObject)_result.Results[0];
 
             if (sample.TryGet("@metadata", out BlittableJsonReaderObject metadata) && metadata.TryGet("@id", out string _))
             {
-                _hasId = true;
                 Columns["id()"] = new PgColumn("id()", (short)Columns.Count, PgText.Default, resultsFormat);
             }
 
@@ -203,12 +200,6 @@ namespace PgRvn.Server
                 return;
             }
 
-            if (_limit == 0)
-            {
-                await writer.WriteAsync(builder.CommandComplete($"SELECT 0"), token);
-                return;
-            }
-
             if (_operation != null)
             {
                 // todo: is this a safe cast?
@@ -223,29 +214,37 @@ namespace PgRvn.Server
                 throw new InvalidOperationException("RqlQuery.Execute was called when _results = null");
             }
 
+            if (_limit == 0 || _result.Results == null || _result.Results.Length == 0)
+            {
+                await writer.WriteAsync(builder.CommandComplete($"SELECT 0"), token);
+                return;
+            }
+
             BlittableJsonReaderObject.PropertyDetails prop = default;
             var row = ArrayPool<ReadOnlyMemory<byte>?>.Shared.Rent(Columns.Count);
             try
             {
-                // TODO: Typically ColumnIndex represents the index in the Postgres table, but we use it here as the dictionary
-                // index which is probably not a good idea because dictionary doesn't gurantee order. Need to reimplement this.
-                var idIndex = Columns["id()"].ColumnIndex;
+                // TODO: Typically ColumnIndex represents the index in the Postgres table, but we use it here for the order of columns sent
+                short? idIndex = null;
+                if (Columns.TryGetValue("id()", out var col))
+                {
+                    idIndex = col.ColumnIndex;
+                }
+
                 var jsonIndex = Columns["json()"].ColumnIndex;
 
                 foreach (BlittableJsonReaderObject result in _result.Results)
                 {
                     Array.Clear(row, 0, row.Length);
 
-                    if (_hasId)
+                    if (idIndex != null && 
+                        result.TryGet("@metadata", out BlittableJsonReaderObject metadata) &&
+                        metadata.TryGet("@id", out string id))
                     {
-                        if (result.TryGet("@metadata", out BlittableJsonReaderObject metadata) &&
-                            metadata.TryGet("@id", out string id))
-                        {
-                            row[idIndex] = Encoding.UTF8.GetBytes(id);
-                        }
+                        row[idIndex.Value] = Encoding.UTF8.GetBytes(id);
                     }
 
-                    result.Modifications = new Sparrow.Json.Parsing.DynamicJsonValue(result);
+                    result.Modifications = new DynamicJsonValue(result);
 
                     foreach (var (key, pgColumn) in Columns)
                     {
