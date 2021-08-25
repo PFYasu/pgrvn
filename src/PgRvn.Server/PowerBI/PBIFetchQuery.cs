@@ -309,9 +309,9 @@ namespace PgRvn.Server.PowerBI
                     continue;
 
                 if (fullNewWhere.Length != 0)
-                    fullNewWhere += " and ";
+                    fullNewWhere += "\nand\n\t";
 
-                fullNewWhere += $"({sqlWhere.Value})";
+                fullNewWhere += $"(\n\t{sqlWhere.Value}\n)";
             }
 
             if (fullNewWhere.Length != 0)
@@ -326,9 +326,9 @@ namespace PgRvn.Server.PowerBI
                 });
 
                 if (where.Success)
-                    fullNewWhere = $" and ({fullNewWhere}) ";
+                    fullNewWhere = $"\nand\n\t({fullNewWhere})\n";
                 else
-                    fullNewWhere = $"where {fullNewWhere} ";
+                    fullNewWhere = $" where\n{fullNewWhere}\n";
 
                 rql = rql.Insert(whereIndex + whereLength, fullNewWhere);
 
@@ -354,15 +354,15 @@ namespace PgRvn.Server.PowerBI
 
         private static string GenerateProjectionString(IEnumerable<KeyValuePair<string, string>> projectionFields)
         {
-            var projection = " select { ";
+            var projection = " select\n{\n";
 
             foreach (var (fieldName, fieldValue) in projectionFields)
             {
-                projection += $"\"{fieldName}\": {fieldValue}, ";
+                projection += $"\t\"{fieldName}\": {fieldValue},\n";
             }
 
             projection = projection[0..^2];
-            projection += " } ";
+            projection += "\n}\n";
 
             return projection;
         }
