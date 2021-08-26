@@ -25,7 +25,6 @@ namespace PgRvn.Server
         private readonly IAsyncDocumentSession _session;
         private QueryResult _result;
         private readonly int? _limit;
-        private Operation _operation;
 
         public RqlQuery(string queryString, int[] parametersDataTypes, IDocumentStore documentStore, int? limit = null) : base(queryString, parametersDataTypes)
         {
@@ -33,7 +32,6 @@ namespace PgRvn.Server
             _session = documentStore.OpenAsyncSession();
             _result = null;
             _limit = limit;
-            _operation = null;
         }
 
         public override async Task<ICollection<PgColumn>> Init(bool allowMultipleStatements = false)
@@ -68,19 +66,8 @@ namespace PgRvn.Server
                 }
             }
 
-            // TODO: Find a better solution for running Patch RQL
-            try
-            {
-                _result = await ((AsyncDocumentQuery<BlittableJsonReaderObject>)query).GetQueryResultAsync();
-            }
-            catch (Raven.Client.Exceptions.RavenException)
-            {
-                _operation = await DocumentStore.Operations.SendAsync(new PatchByQueryOperation(new IndexQuery
-                {
-                    Query = QueryString,
-                    QueryParameters = patchParams
-                }));
-            }
+            // TODO: Support patch RQLs
+            _result = await ((AsyncDocumentQuery<BlittableJsonReaderObject>)query).GetQueryResultAsync();
         }
 
         private ICollection<PgColumn> GenerateSchema()
@@ -197,15 +184,6 @@ namespace PgRvn.Server
             if (IsEmptyQuery)
             {
                 await writer.WriteAsync(builder.EmptyQueryResponse(), token);
-                return;
-            }
-
-            if (_operation != null)
-            {
-                // todo: is this a safe cast?
-                var result = (BulkOperationResult)await _operation.WaitForCompletionAsync();
-
-                await writer.WriteAsync(builder.CommandComplete($"UPDATE {result.Total}"), token);
                 return;
             }
 
