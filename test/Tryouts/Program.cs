@@ -138,6 +138,12 @@ namespace Tryouts
             using var conn = new NpgsqlConnection(connString); conn.Open();
 
             //Select(conn, "from Employees");
+
+            Select(conn, "from Orders where OrderedAtUtc = @param1", new Dictionary<string, (NpgsqlDbType, object)>
+            {
+                ["param1"] = (NpgsqlDbType.Bytea, new byte[1 * 1024 * 1024 - 1000]) // Below 1 MB
+            });
+
             try
             {
                 Select(conn, "from Orders where OrderedAtUtc = @param1", new Dictionary<string, (NpgsqlDbType, object)>

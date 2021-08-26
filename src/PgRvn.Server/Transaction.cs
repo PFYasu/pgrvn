@@ -20,23 +20,29 @@ namespace PgRvn.Server
         Failed = (byte)'E'
     }
 
-    public class Transaction
+    public class Transaction : IDisposable
     {
         public TransactionState State { get; private set; } = TransactionState.Idle;
         public IDocumentStore DocumentStore { get; }
-
+        public MessageReader MessageReader { get; private set; }
+        
         private PgQuery _currentQuery;
         
-        public Transaction(IDocumentStore documentStore)
+        public Transaction(IDocumentStore documentStore, MessageReader messageReader)
         {
             DocumentStore = documentStore;
+            MessageReader = messageReader;
         }
 
         public void Init(string cleanQueryText, int[] parametersDataTypes)
         {
+            State = TransactionState.InTransaction;
+
+            MessageReader?.Dispose();
+            MessageReader = new MessageReader();
+
             _currentQuery?.Dispose();
             _currentQuery = PgQuery.CreateInstance(cleanQueryText, parametersDataTypes, DocumentStore);
-            State = TransactionState.InTransaction;
         }
 
         public void Bind(ICollection<byte[]> parameters, short[] parameterFormatCodes, short[] resultColumnFormatCodes)
@@ -62,6 +68,7 @@ namespace PgRvn.Server
         public void Close()
         {
             State = TransactionState.Idle;
+
             _currentQuery?.Dispose();
             _currentQuery = null;
         }
@@ -69,8 +76,18 @@ namespace PgRvn.Server
         public void Sync()
         {
             State = TransactionState.Idle;
+
             _currentQuery?.Dispose();
             _currentQuery = null;
+        }
+
+        public void Dispose()
+        {
+            _currentQuery?.Dispose();
+            _currentQuery = null;
+
+            MessageReader?.Dispose();
+            MessageReader = null;
         }
     }
 }
