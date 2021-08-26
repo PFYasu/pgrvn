@@ -165,6 +165,8 @@ namespace Tryouts
 
         static void Main(string[] args)
         {
+            Console.WriteLine("Starting PgRvn..");
+
             try
             {
                 var server = new PgRvnServer();
@@ -178,8 +180,11 @@ namespace Tryouts
                 return;
             }
 
-            InitNpgsql();
+            //InitNpgsql();
             //InitODBC();
+            
+            
+            Console.WriteLine("Press any key to exit..");
             Console.ReadKey();
 
 
