@@ -17,6 +17,7 @@ namespace PgRvn.Server
         private readonly CancellationToken _token;
         private readonly int _identifier;
         private readonly int _processId;
+        private Dictionary<string, string> _clientOptions;
 
         public Session(TcpClient client, CancellationToken token, int identifier, int processId)
         {
@@ -24,17 +25,12 @@ namespace PgRvn.Server
             _token = token;
             _identifier = identifier;
             _processId = processId;
+            _clientOptions = null;
         }
 
-        public async Task Run()
+        private async Task HandleInitialMessage(PipeReader reader, PipeWriter writer, MessageBuilder messageBuilder)
         {
-            using var _ = _client;
-            using var messageBuilder = new MessageBuilder();
             var messageReader = new MessageReader();
-            await using var stream = _client.GetStream();
-
-            var reader = PipeReader.Create(stream);
-            var writer = PipeWriter.Create(stream);
 
             var initialMessage = await messageReader.ReadInitialMessage(reader, _token);
             if (initialMessage is SSLRequest)
@@ -43,16 +39,15 @@ namespace PgRvn.Server
                 initialMessage = await messageReader.ReadInitialMessage(reader, _token);
             }
 
-            Dictionary<string, string> clientOptions;
             switch (initialMessage)
             {
                 case StartupMessage startupMessage:
-                    clientOptions = startupMessage.ClientOptions;
+                    _clientOptions = startupMessage.ClientOptions;
                     break;
                 case SSLRequest:
                     await writer.WriteAsync(messageBuilder.ErrorResponse(
-                        PgSeverity.Fatal, 
-                        PgErrorCodes.ProtocolViolation, 
+                        PgSeverity.Fatal,
+                        PgErrorCodes.ProtocolViolation,
                         "SSLRequest received twice"), _token);
                     return;
                 case Cancel cancel:
@@ -69,6 +64,18 @@ namespace PgRvn.Server
                         "Invalid first message received"), _token);
                     return;
             }
+        }
+
+        public async Task Run()
+        {
+            using var _ = _client;
+            using var messageBuilder = new MessageBuilder();
+            await using var stream = _client.GetStream();
+
+            var reader = PipeReader.Create(stream);
+            var writer = PipeWriter.Create(stream);
+
+            await HandleInitialMessage(reader, writer, messageBuilder);
 
             DocumentStore docStore;
             try
@@ -76,7 +83,7 @@ namespace PgRvn.Server
                 docStore = new DocumentStore
                 {
                     Urls = new[] { "http://localhost:8080" },
-                    Database = clientOptions["database"]
+                    Database = _clientOptions["database"]
                 };
                 docStore.Initialize();
             }
@@ -101,6 +108,7 @@ namespace PgRvn.Server
 
                 while (_token.IsCancellationRequested == false)
                 {
+                    using var messageReader = new MessageReader();
                     var message = await messageReader.GetUninitializedMessage(reader, _token);
 
                     try
