@@ -147,7 +147,7 @@ namespace PgRvn.Server.Messages
             }
         }
 
-        public virtual async Task Handle(Transaction transaction, MessageBuilder messageBuilder, MessageReader messageReader, PipeReader reader, PipeWriter writer, CancellationToken token)
+        public virtual async Task Handle(Transaction transaction, MessageBuilder messageBuilder, PipeReader reader, PipeWriter writer, CancellationToken token)
         {
             await HandleMessage(transaction, messageBuilder, writer, token);
         }

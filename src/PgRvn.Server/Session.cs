@@ -99,7 +99,7 @@ namespace PgRvn.Server
 
             try
             {
-                var transaction = new Transaction(docStore);
+                using var transaction = new Transaction(docStore, new MessageReader());
 
                 await writer.WriteAsync(messageBuilder.AuthenticationOk(), _token);
                 await writer.WriteAsync(messageBuilder.ParameterStatusMessages(PgConfig.ParameterStatusList), _token);
@@ -108,13 +108,12 @@ namespace PgRvn.Server
 
                 while (_token.IsCancellationRequested == false)
                 {
-                    using var messageReader = new MessageReader();
-                    var message = await messageReader.GetUninitializedMessage(reader, _token);
+                    var message = await transaction.MessageReader.GetUninitializedMessage(reader, _token);
 
                     try
                     {
-                        await message.Init(messageReader, reader, _token);
-                        await message.Handle(transaction, messageBuilder, messageReader, reader, writer, _token);
+                        await message.Init(transaction.MessageReader, reader, _token);
+                        await message.Handle(transaction, messageBuilder, reader, writer, _token);
                     }
                     catch (PgErrorException e)
                     {
