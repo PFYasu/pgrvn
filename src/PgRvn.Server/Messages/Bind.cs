@@ -46,15 +46,6 @@ namespace PgRvn.Server.Messages
                 var parameterLength = await messageReader.ReadInt32Async(reader, token);
                 len += sizeof(int);
 
-                // Limit parameter size to 1MB
-                if (parameterLength > 1 * 1024 * 1024)
-                {
-                    // Skip to end of message to stay in sync
-                    await messageReader.SkipBytesAsync(reader, token, msgLen - len);
-                    throw new PgErrorException(PgErrorCodes.InvalidParameterValue,
-                        $"Parameter too big, expected 1MB or less but got size of '{parameterLength}'");
-                }
-
                 parameters.Add(await messageReader.ReadBytesAsync(reader, parameterLength, token));
                 len += parameterLength;
             }

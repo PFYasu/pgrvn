@@ -12,8 +12,9 @@ using System.Threading.Tasks;
 
 namespace PgRvn.Server.Messages
 {
-    public class MessageReader
+    public class MessageReader : IDisposable
     {
+        private readonly List<byte[]> _rentedBuffers = new List<byte[]>();
         public async Task<IInitialMessage> ReadInitialMessage(PipeReader reader, CancellationToken token)
         {
             var msgLen = await ReadInt32Async(reader, token) - sizeof(int);
@@ -179,7 +180,17 @@ namespace PgRvn.Server.Messages
         {
             var sequence = readBuffer.Slice(0, length);
 
-            var buffer = new byte[length];
+            byte[] buffer;
+            if (length < 1 * 1024 * 1024)
+            {
+                buffer = ArrayPool<byte>.Shared.Rent(length);
+                _rentedBuffers.Add(buffer);
+            }
+            else
+            {
+                buffer = new byte[length];
+            }
+
             sequence.CopyTo(buffer);
             reader.AdvanceTo(sequence.End);
             return buffer;
@@ -207,6 +218,14 @@ namespace PgRvn.Server.Messages
             var charByte = readBuffer.First.Span[0];
             reader.AdvanceTo(readBuffer.GetPosition(sizeof(byte), readBuffer.Start));
             return charByte;
+        }
+
+        public void Dispose()
+        {
+            foreach (var buffer in _rentedBuffers)
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
     }
 }
