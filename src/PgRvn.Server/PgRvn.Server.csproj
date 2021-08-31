@@ -17,10 +17,15 @@
     <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="RavenDB.Client" Version="5.2.0" />
-    <PackageReference Include="System.IO.Pipelines" Version="5.0.1" />
-  </ItemGroup>
+  <PropertyGroup>
+    <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+
+	<ItemGroup>
+      <PackageReference Include="RavenDB.Client" Version="5.2.0" />
+      <PackageReference Include="System.IO.Pipelines" Version="5.0.1" />
+	</ItemGroup>
 
   <ItemGroup>
     <None Update="Npgsql\npgsql_types_3.csv">

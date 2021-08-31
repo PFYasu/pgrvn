@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Tryouts": {
+      "commandName": "Project",
+      "commandLineArgs": "5433"
+    }
+  }
+}

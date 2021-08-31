@@ -25,15 +25,17 @@ namespace PgRvn.Server
         private TcpListener _tcpListener;
         private int _sessionIdentifier;
         private readonly int _processId;
+        private readonly int _port;
 
-        public PgRvnServer()
+        public PgRvnServer(int port)
         {
             _processId = Process.GetCurrentProcess().Id;
+            _port = port;
         }
 
         public void Initialize()
         {
-            _tcpListener = new TcpListener(IPAddress.Loopback, 5433);
+            _tcpListener = new TcpListener(IPAddress.Any, _port);
             _tcpListener.Start();
 
             _listenTask = ListenToConnectionsAsync();
