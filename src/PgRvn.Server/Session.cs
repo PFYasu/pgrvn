@@ -3,14 +3,17 @@ using PgRvn.Server.Messages;
 using Raven.Client.Documents;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.IO.Pipelines;
+using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace PgRvn.Server
 {
-
     public class Session
     {
         private readonly TcpClient _client;
@@ -28,14 +31,14 @@ namespace PgRvn.Server
             _clientOptions = null;
         }
 
-        private async Task HandleInitialMessage(PipeReader reader, PipeWriter writer, MessageBuilder messageBuilder)
+        private async Task HandleInitialMessage(Stream stream, PipeReader reader, PipeWriter writer, MessageBuilder messageBuilder)
         {
             var messageReader = new MessageReader();
 
             var initialMessage = await messageReader.ReadInitialMessage(reader, _token);
             if (initialMessage is SSLRequest)
             {
-                await TryHandleTlsConnection(writer, messageBuilder, _token);
+                await TryHandleTlsConnection(stream, writer, messageBuilder, _token);
                 initialMessage = await messageReader.ReadInitialMessage(reader, _token);
             }
 
@@ -75,14 +78,14 @@ namespace PgRvn.Server
             var reader = PipeReader.Create(stream);
             var writer = PipeWriter.Create(stream);
 
-            await HandleInitialMessage(reader, writer, messageBuilder);
+            await HandleInitialMessage(stream, reader, writer, messageBuilder);
 
             DocumentStore docStore;
             try
             {
                 docStore = new DocumentStore
                 {
-                    Urls = new[] { "http://localhost:8080" },
+                    Urls = new[] { "https://a.pgrvn.development.run" },
                     Database = _clientOptions["database"]
                 };
                 docStore.Initialize();
@@ -101,7 +104,13 @@ namespace PgRvn.Server
             {
                 using var transaction = new Transaction(docStore, new MessageReader());
 
-                await writer.WriteAsync(messageBuilder.AuthenticationOk(), _token);
+                // Authentication
+                await writer.WriteAsync(messageBuilder.AuthenticationCleartextPassword(), _token);
+                var authMessage = await transaction.MessageReader.GetUninitializedMessage(reader, _token);
+                await authMessage.Init(transaction.MessageReader, reader, _token);
+                await authMessage.Handle(transaction, messageBuilder, reader, writer, _token);
+
+
                 await writer.WriteAsync(messageBuilder.ParameterStatusMessages(PgConfig.ParameterStatusList), _token);
                 await writer.WriteAsync(messageBuilder.BackendKeyData(_processId, _identifier), _token);
                 await writer.WriteAsync(messageBuilder.ReadyForQuery(transaction.State), _token);
@@ -129,6 +138,15 @@ namespace PgRvn.Server
                     e.Message,
                     e.ToString()), _token);
             }
+            catch (PgErrorException e)
+            {
+                // Shouldn't get to this point, PgErrorExceptions shouldn't be fatal
+                await writer.WriteAsync(messageBuilder.ErrorResponse(
+                    PgSeverity.Error,
+                    e.ErrorCode,
+                    e.Message,
+                    e.ToString()), _token);
+            }
             catch (PgTerminateReceivedException)
             {
                 // Terminate silently
@@ -148,11 +166,34 @@ namespace PgRvn.Server
                 }
             }
         }
-
-        private async Task TryHandleTlsConnection(PipeWriter writer, MessageBuilder builder, CancellationToken token)
+        
+        private async Task TryHandleTlsConnection(Stream stream, PipeWriter writer, MessageBuilder builder, CancellationToken token)
         {
             // Refuse SSL
             await writer.WriteAsync(builder.SSLResponse(false), token);
+            return;
+            var sslStream = new SslStream(stream, false, (sender, certificate, chain, errors) =>
+            {
+                return true;
+            }
+            // it is fine that the client doesn't have a cert, we just care that they
+            // are connecting to us securely. At any rate, we'll ensure that if certificate
+            // is required, we'll validate that it is one of the expected ones on the server
+            // and that the client is authorized to do so.
+            // Otherwise, we'll generate an error, but we'll do that at a higher level then
+            // SSL, because that generate a nicer error for the user to read then just aborted
+            // connection because SSL negotiation failed.
+            );
+            const SslProtocols SupportedSslProtocols = SslProtocols.Tls13 | SslProtocols.Tls12;
+            await sslStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
+            {
+                ServerCertificate = new X509Certificate2(@"D:\Code\RavenDB2\Server\cluster.server.certificate.pgrvn.pfx"),
+                ClientCertificateRequired = true,
+                CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
+                EncryptionPolicy = EncryptionPolicy.RequireEncryption,
+                EnabledSslProtocols = SupportedSslProtocols,
+                CipherSuitesPolicy = null
+            }, _token);
 
             // TODO: Establish SSL, respond with 'S' if willing to perform SSL or 'N' otherwise, etc.
         }

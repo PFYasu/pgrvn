@@ -22,11 +22,13 @@ namespace PgRvn.Server.Messages
         Query = (byte)'Q',
         Close = (byte)'C',
         Flush = (byte)'H',
+        PasswordMessage = (byte)'p',
 
         // Sent
         ParameterStatus = (byte)'S',
         BackendKeyData = (byte)'K',
         AuthenticationOk = (byte)'R',
+        AuthenticationCleartextPassword = (byte)'R',
         ReadyForQuery = (byte)'Z',
         ErrorResponse = (byte)'E',
 

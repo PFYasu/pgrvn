@@ -100,6 +100,7 @@ namespace PgRvn.Server.Messages
                 (byte) MessageType.Query => new Query(),
                 (byte) MessageType.Close => new Close(),
                 (byte) MessageType.Flush => new Flush(),
+                (byte) MessageType.PasswordMessage => new PasswordMessage(),
                 _ => throw new PgFatalException(PgErrorCodes.ProtocolViolation,
                     "Message type unrecognized: " + (char) msgType)
             };

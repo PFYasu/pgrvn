@@ -3,71 +3,71 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Odbc;
 using System.Threading;
-//using Npgsql;
-//using NpgsqlTypes;
+using Npgsql;
+using NpgsqlTypes;
 using PgRvn.Server;
 
 namespace Tryouts
 {
     class Program
     {
-        //static void InsertData(NpgsqlConnection conn)
-        //{
-        //    using (var cmd = new NpgsqlCommand("INSERT INTO \"Customers\" (\"First Name\") VALUES (@p, @x)", conn))
-        //    {
-        //        cmd.Parameters.AddWithValue("p", NpgsqlDbType.Name, "Hello world");
-        //        cmd.ExecuteNonQuery();
-        //    }
-        //}
+        static void InsertData(NpgsqlConnection conn)
+        {
+            using (var cmd = new NpgsqlCommand("INSERT INTO \"Customers\" (\"First Name\") VALUES (@p, @x)", conn))
+            {
+                cmd.Parameters.AddWithValue("p", NpgsqlDbType.Name, "Hello world");
+                cmd.ExecuteNonQuery();
+            }
+        }
 
-        //static void Select(NpgsqlConnection conn, string query, Dictionary<string, (NpgsqlDbType, object)> namedArgs = null)
-        //{
-        //    using var cmd = new NpgsqlCommand(query, conn);
-        //    Console.WriteLine(query);
-        //    if (namedArgs != null)
-        //    {
-        //        foreach (var (key, val) in namedArgs)
-        //        {
-        //            Console.WriteLine($"\t{key} = {val}");
-        //            cmd.Parameters.AddWithValue(key, val.Item1, val.Item2);
-        //        }
-        //    }
-            
-        //    using var reader = cmd.ExecuteReader();
+        static void Select(NpgsqlConnection conn, string query, Dictionary<string, (NpgsqlDbType, object)> namedArgs = null)
+        {
+            using var cmd = new NpgsqlCommand(query, conn);
+            Console.WriteLine(query);
+            if (namedArgs != null)
+            {
+                foreach (var (key, val) in namedArgs)
+                {
+                    Console.WriteLine($"\t{key} = {val}");
+                    cmd.Parameters.AddWithValue(key, val.Item1, val.Item2);
+                }
+            }
 
-        //    var dt = new DataTable();
-        //    dt.Load(reader);
+            using var reader = cmd.ExecuteReader();
 
-        //    dt.Print();
-        //}
+            var dt = new DataTable();
+            dt.Load(reader);
 
-        //static void SelectMulti(NpgsqlConnection conn, string query, Dictionary<string, (NpgsqlDbType, object)> namedArgs = null)
-        //{
-        //    using var cmd = new NpgsqlCommand(query, conn);
-        //    Console.WriteLine(query);
-        //    if (namedArgs != null)
-        //    {
-        //        foreach (var (key, val) in namedArgs)
-        //        {
-        //            Console.WriteLine($"\t{key} = {val}");
-        //            cmd.Parameters.AddWithValue(key, val.Item1, val.Item2);
-        //        }
-        //    }
+            dt.Print();
+        }
 
-        //    using var reader = cmd.ExecuteReader();
+        static void SelectMulti(NpgsqlConnection conn, string query, Dictionary<string, (NpgsqlDbType, object)> namedArgs = null)
+        {
+            using var cmd = new NpgsqlCommand(query, conn);
+            Console.WriteLine(query);
+            if (namedArgs != null)
+            {
+                foreach (var (key, val) in namedArgs)
+                {
+                    Console.WriteLine($"\t{key} = {val}");
+                    cmd.Parameters.AddWithValue(key, val.Item1, val.Item2);
+                }
+            }
 
-        //    var dt1 = new DataTable();
-        //    var dt2 = new DataTable();
+            using var reader = cmd.ExecuteReader();
 
-        //    var ds = new DataSet();
-        //    ds.Tables.Add(dt1);
-        //    ds.Tables.Add(dt2);
+            var dt1 = new DataTable();
+            var dt2 = new DataTable();
 
-        //    ds.Load(reader, LoadOption.OverwriteChanges, dt1, dt2);
+            var ds = new DataSet();
+            ds.Tables.Add(dt1);
+            ds.Tables.Add(dt2);
 
-        //    dt1.Print();
-        //    dt2.Print();
-        //}
+            ds.Load(reader, LoadOption.OverwriteChanges, dt1, dt2);
+
+            dt1.Print();
+            dt2.Print();
+        }
 
         static void InitODBC()
         {
@@ -131,37 +131,14 @@ namespace Tryouts
             dt2.Print();
         }
 
-        //private static void InitNpgsql()
-        //{
-        //    //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
-        //    var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;"; // ServerCompatibilityMode=NoTypeLoading
-        //    using var conn = new NpgsqlConnection(connString); conn.Open();
+        private static void InitNpgsql()
+        {
+            //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
+            var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;SSL Mode=Require"; // ServerCompatibilityMode=NoTypeLoading
+            using var conn = new NpgsqlConnection(connString); conn.Open();
 
-        //    //Select(conn, "from Employees");
-
-        //    Select(conn, "from Orders where OrderedAtUtc = @param1", new Dictionary<string, (NpgsqlDbType, object)>
-        //    {
-        //        ["param1"] = (NpgsqlDbType.Bytea, new byte[1 * 1024 * 1024 - 1000]) // Below 1 MB
-        //    });
-
-        //    try
-        //    {
-        //        Select(conn, "from Orders where OrderedAtUtc = @param1", new Dictionary<string, (NpgsqlDbType, object)>
-        //        {
-        //            ["param1"] = (NpgsqlDbType.Bytea, new byte[1 * 1024 * 1024 + 1000]) // Above 1 MB
-        //        });
-        //    }
-        //    catch (Exception e)
-        //    {
-        //        Console.WriteLine("Ignore");
-        //        //Console.WriteLine(e);
-        //    }
-
-        //    Select(conn, "from Orders where OrderedAtUtc = @param1", new Dictionary<string, (NpgsqlDbType, object)>
-        //    {
-        //        ["param1"] = (NpgsqlDbType.Bytea, new byte[1 * 1024 * 1024 - 1000]) // Below 1 MB
-        //    });
-        //}
+            Select(conn, "from Employees");
+        }
 
         static void Main(string[] args)
         {
@@ -185,7 +162,7 @@ namespace Tryouts
             
             
             Console.WriteLine("Press any key to exit..");
-            Console.ReadKey();
+            Console.ReadLine();
 
 
             //Select(conn, "SELECT * FROM \"Customers\"");

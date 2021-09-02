@@ -64,6 +64,23 @@ namespace PgRvn.Server.Messages
             return Buffer[..pos];
         }
 
+        public ReadOnlyMemory<byte> AuthenticationCleartextPassword()
+        {
+            int pos = 0;
+            WriteByte((byte)MessageType.AuthenticationCleartextPassword, ref pos);
+
+            // Skip length
+            int tempPos = pos;
+            pos += sizeof(int);
+
+            WriteInt32(3, ref pos);
+
+            // Write length
+            WriteInt32(pos - sizeof(byte), ref tempPos);
+
+            return Buffer[..pos];
+        }
+
         /// <summary>
         /// Creates an error response message.
         /// </summary>
