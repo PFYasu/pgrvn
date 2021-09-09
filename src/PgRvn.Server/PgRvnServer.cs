@@ -78,7 +78,7 @@ namespace PgRvn.Server
                     _processId);
                 await session.Run();
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 // TODO: Error handling
             }

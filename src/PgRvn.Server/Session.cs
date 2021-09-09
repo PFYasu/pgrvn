@@ -9,6 +9,7 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -36,10 +37,22 @@ namespace PgRvn.Server
             var messageReader = new MessageReader();
 
             var initialMessage = await messageReader.ReadInitialMessage(reader, _token);
+
             if (initialMessage is SSLRequest)
             {
-                await TryHandleTlsConnection(stream, writer, messageBuilder, _token);
-                initialMessage = await messageReader.ReadInitialMessage(reader, _token);
+                var sslStream = await TryHandleTlsConnection(stream, writer, messageBuilder, _token);
+                var encryptedReader = PipeReader.Create(sslStream);
+
+                // TODO: Remove try catch
+                try
+                {
+                    initialMessage = await messageReader.ReadInitialMessage(encryptedReader, _token);
+                }
+                catch (Exception e)
+                {
+                    
+                    throw;
+                }
             }
 
             switch (initialMessage)
@@ -167,35 +180,24 @@ namespace PgRvn.Server
             }
         }
         
-        private async Task TryHandleTlsConnection(Stream stream, PipeWriter writer, MessageBuilder builder, CancellationToken token)
+        private async Task<SslStream> TryHandleTlsConnection(Stream stream, PipeWriter writer, MessageBuilder builder, CancellationToken token)
         {
-            // Refuse SSL
-            await writer.WriteAsync(builder.SSLResponse(false), token);
-            return;
-            var sslStream = new SslStream(stream, false, (sender, certificate, chain, errors) =>
-            {
-                return true;
-            }
-            // it is fine that the client doesn't have a cert, we just care that they
-            // are connecting to us securely. At any rate, we'll ensure that if certificate
-            // is required, we'll validate that it is one of the expected ones on the server
-            // and that the client is authorized to do so.
-            // Otherwise, we'll generate an error, but we'll do that at a higher level then
-            // SSL, because that generate a nicer error for the user to read then just aborted
-            // connection because SSL negotiation failed.
-            );
+            await writer.WriteAsync(builder.SSLResponse(true), token);
+            
+            var sslStream = new SslStream(stream, false);
             const SslProtocols SupportedSslProtocols = SslProtocols.Tls13 | SslProtocols.Tls12;
+
             await sslStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
             {
-                ServerCertificate = new X509Certificate2(@"D:\Code\RavenDB2\Server\cluster.server.certificate.pgrvn.pfx"),
-                ClientCertificateRequired = true,
+                ServerCertificate = X509Certificate.CreateFromCertFile(@"C:\temp\cluster.server.certificate.pgrvn.pfx"), //new X509Certificate2(@"C:\temp\cluster.server.certificate.pgrvn.pfx"),
+                ClientCertificateRequired = false,
                 CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
                 EncryptionPolicy = EncryptionPolicy.RequireEncryption,
                 EnabledSslProtocols = SupportedSslProtocols,
                 CipherSuitesPolicy = null
             }, _token);
 
-            // TODO: Establish SSL, respond with 'S' if willing to perform SSL or 'N' otherwise, etc.
+            return sslStream;
         }
     }
 }

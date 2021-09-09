@@ -135,6 +135,7 @@ namespace Tryouts
         {
             //var connString = "Host=127.0.0.1;Port=5432;User Id=postgres;Password=123456;Database=BookStore;Timeout=600";
             var connString = "Host=127.0.0.1;Port=5433;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;SSL Mode=Require"; // ServerCompatibilityMode=NoTypeLoading
+            //var connString = "Host=3.16.109.14;Port=5432;User Id=postgres;Password=123456;Database=Northwind;Timeout=1000;SSL Mode=Require"; // ServerCompatibilityMode=NoTypeLoading
             using var conn = new NpgsqlConnection(connString); conn.Open();
 
             Select(conn, "from Employees");
@@ -157,10 +158,10 @@ namespace Tryouts
                 return;
             }
 
-            //InitNpgsql();
+            InitNpgsql();
             //InitODBC();
-            
-            
+
+
             Console.WriteLine("Press any key to exit..");
             Console.ReadLine();
 
