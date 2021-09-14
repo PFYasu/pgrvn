@@ -41,9 +41,18 @@ namespace PgRvn.Server.Types
             };
         }
 
+        /// <summary>
+        /// Get an instance of a PgType from its name.
+        /// </summary>
+        /// <param name="dataType">Type name provided in the query string</param>
+        /// <returns>The corresponding type's default instance</returns>
+        /// <remarks>
+        /// Some clients, such as ODBC, can provide either no type information or provide it in the query string
+        /// in the form of $1::typename. So if no information is provided clients should provide it manually by adding the ::typename.
+        /// </remarks>
         public static PgType Parse(string dataType)
         {
-            // TODO: Make sure these are the actual possible strings of each type
+            // TODO: Make sure these are the actual possible strings for each type being sent by ODBC. It's possible that no type info will be sent at all for some types.
             return dataType switch
             {
                 "bool" => PgBool.Default,
