@@ -27,7 +27,7 @@ namespace PgRvn.Server.Messages
 
         protected override async Task HandleMessage(Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
-            // TODO: Support multiple SELECT statements in one query
+            // TODO: Maybe support multiple SELECT statements in one query - requires parsing the SQL
             using var query = PgQuery.CreateInstance(QueryString, null, transaction.DocumentStore);
 
             var schema = await query.Init(true);

@@ -60,7 +60,8 @@ namespace PgRvn.Server.PowerBI
         {
             // Note: We don't call base.Bind(..) because we only support parameters for this custom RQL, not the original SQL
 
-            // TODO: Once RavenDB-17075 is merged, uncomment this and remove the workaround
+            // TODO: After integration (we need code from RavenDB-17075), instead of directly putting the `tableName` in the query string,
+            // uncomment the following line to add it as a parameter instead:
             //Parameters.Add("$tableName", _tableName);
         }
 

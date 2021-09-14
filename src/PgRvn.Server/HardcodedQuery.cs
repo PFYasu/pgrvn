@@ -21,10 +21,8 @@ namespace PgRvn.Server
 
         public void Parse(bool allowMultipleStatements)
         {
-            // TODO: The hardcoded queries in NpgsqlConfig might look a bit different for every user because they are generated using
-            // a function. Add support to more than just the current queries by not matching the entire string but ignoring parts of it.
-            // TODO: Find a way to support multiple statements - TSQL doesn't seem to provide each statement's string
-            // TODO: Treat the results like any other data source and acknowledge the results format
+            // TODO: The hardcoded queries in NpgsqlConfig might look a bit different for every user because they are generated using a function. Add support to more than just the current queries by not matching the entire string but ignoring parts of it.
+            // TODO: For more accurate implementation, use the `resultsFormat` and send an appropriate _result table (Binary or Text). So for example return PowerBIConfig.TableScheamResponseBinary when the foramt is binary, and PowerBIConfig.TableScheamResponseText otherwise.
             var resultsFormat = GetDefaultResultsFormat();
 
             var normalizedQuery = QueryString.NormalizeLineEndings();

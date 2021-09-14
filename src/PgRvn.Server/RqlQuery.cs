@@ -53,7 +53,7 @@ namespace PgRvn.Server
             if (_limit != null)
                 query.Take(_limit.Value == 0 ? 1 : _limit.Value);
 
-            // TODO: Support skipping (check how/if powerbi sends it, probably using the incremental refresh feature)
+            // TODO: Support skipping (check how/if PowerBI sends it, probably using the incremental refresh feature)
             // query.Skip(..)
 
             var patchParams = new Raven.Client.Parameters();
@@ -66,7 +66,6 @@ namespace PgRvn.Server
                 }
             }
 
-            // TODO: Support patch RQLs
             _result = await ((AsyncDocumentQuery<BlittableJsonReaderObject>)query).GetQueryResultAsync();
         }
 
@@ -147,7 +146,7 @@ namespace PgRvn.Server
 
         public static bool TryParse(string queryText, int[] parametersDataTypes, IDocumentStore documentStore, out RqlQuery rqlQuery)
         {
-            // TODO: Use QueryParser to try and parse the query
+            // TODO: After integration - Use QueryParser to try and parse the query
             if (queryText.StartsWith("from", StringComparison.CurrentCultureIgnoreCase) ||
                 queryText.StartsWith("/*rql*/", StringComparison.CurrentCultureIgnoreCase))
             {

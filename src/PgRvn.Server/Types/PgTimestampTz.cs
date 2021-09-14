@@ -45,7 +45,6 @@ namespace PgRvn.Server.Types
             return new DateTime(timestamp * PgTimestamp.TicksMultiplier + PgTimestamp.OffsetTicks, DateTimeKind.Utc);
         }
 
-        // TODO: Try using PgTimestamp's function instead, but make sure that the conversions don't break anything
         private static long GetTimestampTz(DateTimeOffset timestamp)
         {
             return (timestamp.Ticks - PgTimestamp.OffsetTicks) / PgTimestamp.TicksMultiplier;

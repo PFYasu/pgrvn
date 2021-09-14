@@ -9,7 +9,7 @@ namespace PgRvn.Server
     public static class PgConfig
     {
         // TODO: Customize these
-        // TODO: Support changing these after startup by the user
+        // TODO: Maybe support changing these after startup by the user (it will send queries that start with "SET")
         public static readonly Dictionary<string, string> ParameterStatusList = new(StringComparer.OrdinalIgnoreCase)
         {
             ["client_encoding"] = "UTF8",

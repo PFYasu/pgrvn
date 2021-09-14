@@ -62,7 +62,7 @@ namespace PgRvn.Server
                 }
                 catch (Exception e)
                 {
-                    // TODO: error handling here
+                    // TODO: Error handling (won't be needed after integration as Raven.Server has this logic already)
                     throw;
                 }
 
@@ -80,7 +80,7 @@ namespace PgRvn.Server
             }
             catch (Exception e)
             {
-                // TODO: Error handling
+                // TODO: Error handling (won't be needed after integration as Raven.Server has this logic already)
             }
         }
     }

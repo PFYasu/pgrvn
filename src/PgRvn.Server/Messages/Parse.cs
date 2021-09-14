@@ -85,7 +85,7 @@ namespace PgRvn.Server.Messages
             }
 
             // Change $1 to $p1 because RQL doesn't accept numeric named paramters
-            // TODO: Remove this once project is integrated into raven
+            // TODO: Remove this once project is integrated into raven - RQL now supports $1 as a parameter
             cleanQueryText = new Regex(@"(?<=\$)([0-9])").Replace(cleanQueryText, "p$0");
 
             transaction.Init(cleanQueryText, ParametersDataTypes);

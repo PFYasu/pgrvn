@@ -56,7 +56,7 @@ namespace PgRvn.Server.PowerBI
             string newRql = null;
             if (rql != null && rql.Success)
             {
-                // TODO: Integrate with Raven.Server's QueryParser to support things like "select LastName as last" and "select "test""
+                // TODO: After integration, use Raven.Server's QueryParser instead of this regex so we support more complex RQLs like "select LastName as last" and "select "test""
 
                 var alias = rql.Groups["alias"].Success ? rql.Groups["alias"].Value : "x";
 
@@ -127,7 +127,7 @@ namespace PgRvn.Server.PowerBI
 
                 var orderedProjectionFields = GetOrderedProjectionFields(matches, projectionFields);
 
-                // TODO: Provide these as parameters to prevent SQL injection (depends on RavenDB-17075)
+                // TODO: After integration, provide these as parameters to prevent SQL injection (depends on RavenDB-17075)
                 newRql = $"from {matches[0].Groups["table_name"].Value} as {alias} ";
                 newRql += GenerateProjectionString(orderedProjectionFields);
             }

@@ -71,7 +71,7 @@ namespace PgRvn.Server.Messages
 
         protected override async Task HandleMessage(Transaction transaction, MessageBuilder messageBuilder, PipeWriter writer, CancellationToken token)
         {
-            // TODO: Support named statements/portals
+            // TODO: Maybe support named statements/portals
             if (!string.IsNullOrEmpty(StatementName) || !string.IsNullOrEmpty(PortalName))
             {
                 throw new PgErrorException(PgErrorCodes.FeatureNotSupported,
@@ -87,7 +87,6 @@ namespace PgRvn.Server.Messages
                     $"to be 0, 1 or equal to the parameters count {Parameters.Count}.");
             }
 
-            // TODO: Consider moving some of the logic from PgQuery.Bind into here if logical
             transaction.Bind(Parameters, ParameterFormatCodes, ResultColumnFormatCodes);
             await writer.WriteAsync(messageBuilder.BindComplete(), token);
         }
