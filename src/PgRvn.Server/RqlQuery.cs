@@ -201,7 +201,6 @@ namespace PgRvn.Server
             var row = ArrayPool<ReadOnlyMemory<byte>?>.Shared.Rent(Columns.Count);
             try
             {
-                // TODO: Typically ColumnIndex represents the index in the Postgres table, but we use it here for the order of columns sent
                 short? idIndex = null;
                 if (Columns.TryGetValue("id()", out var col))
                 {

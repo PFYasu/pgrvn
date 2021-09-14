@@ -304,7 +304,7 @@ namespace PgRvn.Server.PowerBI
             var fullNewWhere = CombineSqlMatchesWhereClause(sqlMatches);
             if (fullNewWhere.Length != 0)
             {
-                fullNewWhere = WhereColumnRegex.Replace(fullNewWhere.ToString(), "${column}");
+                fullNewWhere = WhereColumnRegex.Replace(fullNewWhere, "${column}");
                 fullNewWhere = WhereOperatorRegex.Replace(fullNewWhere, (m) =>
                 {
                     if (OperatorMap.TryGetValue(m.Value, out var val))

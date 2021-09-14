@@ -18,7 +18,7 @@ namespace PgRvn.Server.Types
         public abstract object FromBytes(byte[] buffer, PgFormat formatCode);
         public abstract object FromString(string value);
 
-        public static PgType Parse(int dataType) // todo: int typeModifier
+        public static PgType Parse(int dataType)
         {
             return dataType switch
             {

@@ -114,7 +114,6 @@ namespace PgRvn.Server
                 await authMessage.Init(transaction.MessageReader, reader, _token);
                 await authMessage.Handle(transaction, messageBuilder, reader, writer, _token);
 
-
                 await writer.WriteAsync(messageBuilder.ParameterStatusMessages(PgConfig.ParameterStatusList), _token);
                 await writer.WriteAsync(messageBuilder.BackendKeyData(_processId, _identifier), _token);
                 await writer.WriteAsync(messageBuilder.ReadyForQuery(transaction.State), _token);
