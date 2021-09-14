@@ -43,16 +43,7 @@ namespace PgRvn.Server
                 var sslStream = await TryHandleTlsConnection(stream, writer, messageBuilder, _token);
                 var encryptedReader = PipeReader.Create(sslStream);
 
-                // TODO: Remove try catch
-                try
-                {
-                    initialMessage = await messageReader.ReadInitialMessage(encryptedReader, _token);
-                }
-                catch (Exception e)
-                {
-                    
-                    throw;
-                }
+                initialMessage = await messageReader.ReadInitialMessage(encryptedReader, _token);
             }
 
             switch (initialMessage)
@@ -98,7 +89,7 @@ namespace PgRvn.Server
             {
                 docStore = new DocumentStore
                 {
-                    Urls = new[] { "https://a.pgrvn.development.run" },
+                    Urls = new[] { "http://127.0.0.1:8080" },
                     Database = _clientOptions["database"]
                 };
                 docStore.Initialize();

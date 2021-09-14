@@ -158,7 +158,7 @@ namespace Tryouts
                 return;
             }
 
-            InitNpgsql();
+            //InitNpgsql();
             //InitODBC();
 
 
