@@ -26,7 +26,7 @@ namespace PgRvn.Server
 
         protected PgQuery(string queryString, int[] parametersDataTypes)
         {
-            QueryString = queryString;
+            QueryString = queryString.Trim();
             ParametersDataTypes = parametersDataTypes ?? Array.Empty<int>();
             IsEmptyQuery = string.IsNullOrWhiteSpace(QueryString);
             Parameters = new Dictionary<string, object>();
@@ -36,6 +36,7 @@ namespace PgRvn.Server
 
         public static PgQuery CreateInstance(string queryText, int[] parametersDataTypes, IDocumentStore documentStore)
         {
+            queryText = queryText.Trim();
             if (RqlQuery.TryParse(queryText, parametersDataTypes, documentStore, out var rqlQuery))
             {
                 return rqlQuery;
